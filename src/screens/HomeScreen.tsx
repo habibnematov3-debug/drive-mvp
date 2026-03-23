@@ -102,7 +102,19 @@ export default function HomeScreen({ onSubmitRequest }: HomeScreenProps) {
         }),
       })
 
-      const result = await response.json()
+      const contentType = response.headers.get('content-type') ?? ''
+      const responseBody = await response.text()
+
+      if (!contentType.includes('application/json')) {
+        throw new Error(
+          'API returned HTML instead of JSON. Check VITE_API_BASE_URL and redeploy the frontend.',
+        )
+      }
+
+      const result = JSON.parse(responseBody) as {
+        success?: boolean
+        error?: string
+      }
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Request failed')

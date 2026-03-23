@@ -11,7 +11,13 @@ export function getApiBaseUrl() {
     return normalizeBaseUrl(configuredBaseUrl)
   }
 
-  return import.meta.env.DEV ? LOCAL_API_BASE_URL : ''
+  if (import.meta.env.DEV) {
+    return LOCAL_API_BASE_URL
+  }
+
+  throw new Error(
+    'VITE_API_BASE_URL is not configured. Set it in your deployment environment and redeploy.',
+  )
 }
 
 export function buildApiUrl(path: string) {
