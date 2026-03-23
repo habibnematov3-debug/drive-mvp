@@ -5,9 +5,10 @@ import { formatRequestStatus } from '../utils/format'
 
 type OrdersScreenProps = {
   orders: RideRequest[]
+  isLoading?: boolean
 }
 
-export default function OrdersScreen({ orders }: OrdersScreenProps) {
+export default function OrdersScreen({ orders, isLoading = false }: OrdersScreenProps) {
   const [query, setQuery] = useState('')
 
   const filtered = useMemo(() => {
@@ -67,9 +68,15 @@ export default function OrdersScreen({ orders }: OrdersScreenProps) {
           </div>
         ))}
 
-        {filtered.length === 0 ? (
+        {!isLoading && filtered.length === 0 ? (
           <div className="bg-white p-4 text-sm text-brand-muted">
             So'rovingiz bo'yicha arizalar topilmadi.
+          </div>
+        ) : null}
+
+        {isLoading ? (
+          <div className="bg-white p-4 text-sm text-brand-muted">
+            Arizalar yuklanmoqda...
           </div>
         ) : null}
       </div>

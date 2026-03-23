@@ -15,6 +15,9 @@ const HEADERS = [
   'haydovchi_ismi',
   'haydovchi_telefon',
   'narx',
+  'telegram_user_id',
+  'full_car',
+  'passenger_gender',
 ]
 
 let sheetsClient = null
@@ -86,6 +89,9 @@ async function appendBooking(bookingData) {
     haydovchi_ismi: '',
     haydovchi_telefon: '',
     narx: '',
+    telegram_user_id: bookingData.telegram_user_id || '',
+    full_car: bookingData.full_car ? 'true' : 'false',
+    passenger_gender: bookingData.passenger_gender || 'any',
   }
 
   const row = HEADERS.map((header) => rowData[header] ?? '')
@@ -101,6 +107,117 @@ async function appendBooking(bookingData) {
   })
 
   return bookingId
+}
+
+function parseBoolean(value) {
+  if (typeof value !== 'string') return false
+  return ['true', '1', 'yes', 'ha'].includes(value.trim().toLowerCase())
+}
+
+function parsePassengerGender(value, comment) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+
+  if (normalized === 'male' || normalized === 'female' || normalized === 'any') {
+    return normalized
+  }
+
+  if (comment.includes('Mijoz jinsi: Erkak')) return 'male'
+  if (comment.includes('Mijoz jinsi: Ayol')) return 'female'
+
+  return 'any'
+}
+
+function parseFullCar(value, comment) {
+  if (parseBoolean(value)) return true
+  return comment.includes("To'liq mashina: ha")
+}
+
+function parseComment(comment) {
+  return comment
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        !line.startsWith("To'liq mashina:") && !line.startsWith('Mijoz jinsi:'),
+    )
+    .join('\n')
+}
+
+function mapStatus(status) {
+  const normalized = typeof status === 'string' ? status.trim().toLowerCase() : ''
+
+  if (
+    normalized.includes('bekor') ||
+    normalized === 'cancelled' ||
+    normalized === 'canceled'
+  ) {
+    return 'cancelled'
+  }
+
+  if (
+    normalized.includes('haydovchi topildi') ||
+    normalized.includes('matched')
+  ) {
+    return 'matched'
+  }
+
+  return 'submitted'
+}
+
+function mapRouteId(routeLabel) {
+  if (routeLabel === 'Kokand → Tashkent') return 'kokand-tashkent'
+  if (routeLabel === 'Tashkent → Kokand') return 'tashkent-kokand'
+  return null
+}
+
+function buildRowObject(headers, row) {
+  return headers.reduce((acc, header, index) => {
+    acc[header] = row[index] ?? ''
+    return acc
+  }, {})
+}
+
+async function listBookingsByTelegramUser(telegramUserId) {
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${SHEET_NAME}!A:Z`,
+  })
+
+  const rows = res.data.values || []
+  const [headers = [], ...dataRows] = rows
+
+  return dataRows
+    .map((row) => buildRowObject(headers, row))
+    .filter((row) => String(row.telegram_user_id || '').trim() === String(telegramUserId))
+    .map((row) => {
+      const routeLabel = row.yonalish || ''
+      const comment = row.izoh || ''
+
+      return {
+        id: `AR-${row.buyurtma_id}`,
+        routeId: mapRouteId(routeLabel),
+        routeLabel,
+        dateISO: row.sana || '',
+        time: row.vaqt || '',
+        passengerCount: Number(row.joylar_soni || 1),
+        fullCar: parseFullCar(row.full_car, comment),
+        passengerGender: parsePassengerGender(row.passenger_gender, comment),
+        status: mapStatus(row.holat),
+        comment: parseComment(comment) || undefined,
+        createdAtISO: row.yaratilgan_vaqt || '',
+      }
+    })
+    .filter(
+      (booking) =>
+        booking.routeId &&
+        booking.dateISO &&
+        booking.time &&
+        Number.isFinite(booking.passengerCount),
+    )
+    .reverse()
 }
 
 async function ensureHeader() {
@@ -128,4 +245,4 @@ async function ensureHeader() {
   }
 }
 
-module.exports = { appendBooking, ensureHeader, HEADERS }
+module.exports = { appendBooking, ensureHeader, listBookingsByTelegramUser, HEADERS }
