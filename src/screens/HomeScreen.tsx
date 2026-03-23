@@ -6,7 +6,6 @@ import RouteSelector from '../components/RouteSelector'
 import TimePicker from '../components/TimePicker'
 import ToggleSwitch from '../components/ToggleSwitch'
 import { routeLabels } from '../data/mock'
-import { buildApiUrl } from '../config/api'
 import type {
   PassengerGender,
   RequestFormData,
@@ -88,7 +87,15 @@ export default function HomeScreen({ onSubmitRequest }: HomeScreenProps) {
     const user = tg?.initDataUnsafe?.user
 
     try {
-      const response = await fetch(buildApiUrl('/bookings'), {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '')
+
+      if (!apiBaseUrl) {
+        throw new Error(
+          'VITE_API_BASE_URL is not configured. Set it in Netlify and redeploy the frontend.',
+        )
+      }
+
+      const response = await fetch(`${apiBaseUrl}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -102,22 +109,29 @@ export default function HomeScreen({ onSubmitRequest }: HomeScreenProps) {
         }),
       })
 
-      const contentType = response.headers.get('content-type') ?? ''
       const responseBody = await response.text()
+      const contentType = response.headers.get('content-type') ?? ''
+      const statusLabel = `${response.status} ${response.statusText}`.trim()
 
       if (!contentType.includes('application/json')) {
         throw new Error(
-          'API returned HTML instead of JSON. Check VITE_API_BASE_URL and redeploy the frontend.',
+          `API returned non-JSON response (${statusLabel}): ${responseBody}`,
         )
       }
 
-      const result = JSON.parse(responseBody) as {
-        success?: boolean
-        error?: string
+      let result: { success?: boolean; error?: string }
+
+      try {
+        result = JSON.parse(responseBody) as {
+          success?: boolean
+          error?: string
+        }
+      } catch {
+        throw new Error(`API returned invalid JSON (${statusLabel}): ${responseBody}`)
       }
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Request failed')
+        throw new Error(result.error || `Request failed (${statusLabel})`)
       }
 
       onSubmitRequest(requestPayload)
