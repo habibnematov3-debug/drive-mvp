@@ -15,26 +15,10 @@ import {
   getDefaultTimeValue,
   getTodayISO,
 } from '../utils/format'
+import { formatTelegramDisplayName, getTelegramUser } from '../utils/telegram'
 
 type HomeScreenProps = {
   onSubmitRequest: (payload: RequestFormData) => void
-}
-
-type TelegramWebAppUser = {
-  id?: number
-  first_name?: string
-}
-
-type TelegramWebApp = {
-  initDataUnsafe?: {
-    user?: TelegramWebAppUser
-  }
-}
-
-type TelegramWindow = Window & {
-  Telegram?: {
-    WebApp?: TelegramWebApp
-  }
 }
 
 function SuccessIcon() {
@@ -83,8 +67,7 @@ export default function HomeScreen({ onSubmitRequest }: HomeScreenProps) {
       comment: comment.trim() ? comment.trim() : undefined,
     }
 
-    const tg = (window as TelegramWindow).Telegram?.WebApp
-    const user = tg?.initDataUnsafe?.user
+    const user = getTelegramUser()
 
     try {
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '')
@@ -105,7 +88,9 @@ export default function HomeScreen({ onSubmitRequest }: HomeScreenProps) {
           seats: passengerCount,
           comment: requestPayload.comment ?? '',
           telegram_user_id: user?.id,
-          ...(user?.first_name ? { passenger_name: user.first_name } : {}),
+          ...(formatTelegramDisplayName(user)
+            ? { passenger_name: formatTelegramDisplayName(user) }
+            : {}),
         }),
       })
 

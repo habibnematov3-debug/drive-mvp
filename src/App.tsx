@@ -4,12 +4,18 @@ import AppLayout from './layout/AppLayout'
 import HomeScreen from './screens/HomeScreen'
 import OrdersScreen from './screens/OrdersScreen'
 import ProfileScreen from './screens/ProfileScreen'
-import type { RequestFormData, RideRequest, TabKey } from './types/drivee'
+import type { Passenger, RequestFormData, RideRequest, TabKey } from './types/drivee'
+import { buildPassengerFromTelegram, getTelegramUser } from './utils/telegram'
 
 export default function App() {
   const [tab, setTab] = useState<TabKey>('home')
   const [orders, setOrders] = useState<RideRequest[]>(initialRequests)
+  const [passenger, setPassenger] = useState<Passenger>(mockUser)
   const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    setPassenger(buildPassengerFromTelegram(getTelegramUser(), mockUser))
+  }, [])
 
   useEffect(() => {
     if (!toast) return
@@ -54,7 +60,7 @@ export default function App() {
           <OrdersScreen orders={orders} />
         ) : (
           <ProfileScreen
-            passenger={mockUser}
+            passenger={passenger}
             onLogout={() => showToast("Demo rejimida chiqish o'chirilgan")}
             onSupport={() => showToast("Operator tez orada siz bilan bog'lanadi")}
           />

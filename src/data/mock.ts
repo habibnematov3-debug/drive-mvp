@@ -8,7 +8,7 @@ export const routeLabels: Record<RouteId, string> = {
 
 export const mockUser: Passenger = {
   name: 'Madina Karimova',
-  phone: '+998 90 123-45-67',
+  secondaryLine: '+998 90 123-45-67',
   languageLabel: "O'zbekcha",
 }
 

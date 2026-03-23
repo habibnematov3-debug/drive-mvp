@@ -32,6 +32,7 @@ export interface RequestFormData {
 
 export interface Passenger {
   name: string
-  phone: string
+  secondaryLine: string
   languageLabel: string
+  avatarUrl?: string
 }

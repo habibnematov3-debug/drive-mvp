@@ -11,19 +11,29 @@ export default function ProfileCard({
   onLogout,
   onSupport,
 }: ProfileCardProps) {
-  const initial = passenger.name.trim().slice(0, 1).toUpperCase()
+  const initial = passenger.name.trim().slice(0, 1).toUpperCase() || 'D'
 
   return (
     <section className="rounded-[28px] border border-brand-line bg-white p-4 shadow-soft">
       <div className="flex items-center gap-3">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[24px] bg-brand-blue-soft font-semibold text-brand-blue">
-          {initial}
-        </div>
+        {passenger.avatarUrl ? (
+          <img
+            src={passenger.avatarUrl}
+            alt={passenger.name}
+            className="h-14 w-14 rounded-[24px] object-cover"
+          />
+        ) : (
+          <div className="flex h-14 w-14 items-center justify-center rounded-[24px] bg-brand-blue-soft font-semibold text-brand-blue">
+            {initial}
+          </div>
+        )}
         <div className="min-w-0">
           <div className="text-base font-semibold text-brand-ink">
             {passenger.name}
           </div>
-          <div className="mt-1 text-sm text-brand-muted">{passenger.phone}</div>
+          <div className="mt-1 text-sm text-brand-muted">
+            {passenger.secondaryLine}
+          </div>
         </div>
       </div>
 
