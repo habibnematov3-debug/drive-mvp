@@ -48,6 +48,7 @@ export default defineConfig([
 - Build command: `npm run build`
 - Publish directory: `dist`
 - Set `VITE_API_BASE_URL` in Netlify to the deployed backend URL, for example `https://your-backend.example.com`
+- Optional: set `VITE_TELEGRAM_BOT_URL` to your bot link, for example `https://t.me/your_bot_username`
 - The app falls back to `http://localhost:3000` in local development
 
 ## Render Backend Deployment

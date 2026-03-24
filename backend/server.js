@@ -2,6 +2,7 @@ require('dotenv').config()
 
 const cors = require('cors')
 const express = require('express')
+const authRouter = require('./src/authRouter')
 const bookingsRouter = require('./src/bookingsRouter')
 const { getBot } = require('./src/bot')
 const { ensureHeader } = require('./src/sheets')
@@ -16,6 +17,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'drivee-backend' })
 })
 
+app.use('/auth', authRouter)
 app.use('/bookings', bookingsRouter)
 app.use('/requests', bookingsRouter)
 

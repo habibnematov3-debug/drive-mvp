@@ -1,7 +1,7 @@
 const { google } = require('googleapis')
 
-const SHEET_NAME = 'bookings'
-const HEADERS = [
+const BOOKINGS_SHEET_NAME = 'bookings'
+const BOOKINGS_HEADERS = [
   'buyurtma_id',
   'yaratilgan_vaqt',
   'yonalish',
@@ -18,6 +18,17 @@ const HEADERS = [
   'telegram_user_id',
   'full_car',
   'passenger_gender',
+]
+const USERS_SHEET_NAME = 'users'
+const USERS_HEADERS = [
+  'telegram_user_id',
+  'first_name',
+  'last_name',
+  'username',
+  'language_code',
+  'photo_url',
+  'registered_at',
+  'last_seen_at',
 ]
 
 let sheetsClient = null
@@ -62,7 +73,7 @@ async function getSheetsClient() {
 async function getNextBookingId(sheets, spreadsheetId) {
   const readRes = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${SHEET_NAME}!A:A`,
+    range: `${BOOKINGS_SHEET_NAME}!A:A`,
   })
 
   const existingRows = readRes.data.values || []
@@ -98,7 +109,7 @@ async function appendBooking(bookingData) {
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${SHEET_NAME}!A1`,
+    range: `${BOOKINGS_SHEET_NAME}!A1`,
     valueInputOption: 'USER_ENTERED',
     insertDataOption: 'INSERT_ROWS',
     requestBody: {
@@ -107,6 +118,90 @@ async function appendBooking(bookingData) {
   })
 
   return bookingId
+}
+
+async function ensureSheetHeader(sheetName, headers) {
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!1:1`,
+  })
+
+  const firstRow = res.data.values?.[0] || []
+  const isSameHeader =
+    firstRow.length === headers.length &&
+    headers.every((header, index) => firstRow[index] === header)
+
+  if (!isSameHeader) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${sheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [headers] },
+    })
+    console.log(`[Sheets] Header row synced for ${sheetName}`)
+  }
+}
+
+function normalizeUserField(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+async function upsertTelegramUser(user) {
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+  const telegramUserId = String(user.id)
+  const now = new Date().toISOString()
+
+  const rowData = {
+    telegram_user_id: telegramUserId,
+    first_name: normalizeUserField(user.first_name),
+    last_name: normalizeUserField(user.last_name),
+    username: normalizeUserField(user.username),
+    language_code: normalizeUserField(user.language_code),
+    photo_url: normalizeUserField(user.photo_url),
+    registered_at: now,
+    last_seen_at: now,
+  }
+
+  const readRes = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${USERS_SHEET_NAME}!A:H`,
+  })
+
+  const rows = readRes.data.values || []
+  const dataRows = rows.slice(1)
+  const existingIndex = dataRows.findIndex(
+    (row) => String(row[0] || '').trim() === telegramUserId,
+  )
+
+  if (existingIndex >= 0) {
+    const existingRow = dataRows[existingIndex]
+    rowData.registered_at = existingRow[6] || now
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${USERS_SHEET_NAME}!A${existingIndex + 2}:H${existingIndex + 2}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [USERS_HEADERS.map((header) => rowData[header] ?? '')],
+      },
+    })
+
+    return
+  }
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `${USERS_SHEET_NAME}!A1`,
+    valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: {
+      values: [USERS_HEADERS.map((header) => rowData[header] ?? '')],
+    },
+  })
 }
 
 function parseBoolean(value) {
@@ -221,28 +316,14 @@ async function listBookingsByTelegramUser(telegramUserId) {
 }
 
 async function ensureHeader() {
-  const sheets = await getSheetsClient()
-  const spreadsheetId = process.env.GOOGLE_SHEET_ID
-
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${SHEET_NAME}!1:1`,
-  })
-
-  const firstRow = res.data.values?.[0] || []
-  const isSameHeader =
-    firstRow.length === HEADERS.length &&
-    HEADERS.every((header, index) => firstRow[index] === header)
-
-  if (!isSameHeader) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${SHEET_NAME}!A1`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [HEADERS] },
-    })
-    console.log('[Sheets] Header row synced')
-  }
+  await ensureSheetHeader(BOOKINGS_SHEET_NAME, BOOKINGS_HEADERS)
+  await ensureSheetHeader(USERS_SHEET_NAME, USERS_HEADERS)
 }
 
-module.exports = { appendBooking, ensureHeader, listBookingsByTelegramUser, HEADERS }
+module.exports = {
+  appendBooking,
+  ensureHeader,
+  listBookingsByTelegramUser,
+  upsertTelegramUser,
+  HEADERS: BOOKINGS_HEADERS,
+}

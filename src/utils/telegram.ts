@@ -10,9 +10,14 @@ export type TelegramWebAppUser = {
 }
 
 type TelegramWebApp = {
+  initData?: string
   initDataUnsafe?: {
     user?: TelegramWebAppUser
   }
+  ready?: () => void
+  expand?: () => void
+  close?: () => void
+  openTelegramLink?: (url: string) => void
 }
 
 type TelegramWindow = Window & {
@@ -37,6 +42,15 @@ export function getTelegramUser() {
   return (window as TelegramWindow).Telegram?.WebApp?.initDataUnsafe?.user ?? null
 }
 
+export function getTelegramWebApp() {
+  if (typeof window === 'undefined') return null
+  return (window as TelegramWindow).Telegram?.WebApp ?? null
+}
+
+export function getTelegramInitData() {
+  return getTelegramWebApp()?.initData?.trim() || ''
+}
+
 export function formatTelegramDisplayName(user?: TelegramWebAppUser | null) {
   if (!user) return ''
 
@@ -54,25 +68,45 @@ export function formatTelegramDisplayName(user?: TelegramWebAppUser | null) {
 
 export function buildPassengerFromTelegram(
   user: TelegramWebAppUser | null,
-  fallbackPassenger: Passenger,
 ): Passenger {
   if (!user) {
-    return fallbackPassenger
+    return {
+      name: '',
+      secondaryLine: '',
+      languageLabel: '',
+    }
   }
 
-  const name = formatTelegramDisplayName(user) || fallbackPassenger.name
+  const name = formatTelegramDisplayName(user)
   const secondaryLine =
     user.username
       ? `@${user.username}`
       : user.id
         ? `Telegram ID: ${user.id}`
-        : fallbackPassenger.secondaryLine
+        : ''
 
   return {
-    name,
+    name: name || 'Telegram user',
     secondaryLine,
     languageLabel:
-      normalizeLanguageLabel(user.language_code) ?? fallbackPassenger.languageLabel,
-    avatarUrl: user.photo_url ?? fallbackPassenger.avatarUrl,
+      normalizeLanguageLabel(user.language_code) ?? '',
+    avatarUrl: user.photo_url,
+  }
+}
+
+export function closeTelegramMiniApp() {
+  getTelegramWebApp()?.close?.()
+}
+
+export function openTelegramUrl(url: string) {
+  const webApp = getTelegramWebApp()
+
+  if (webApp?.openTelegramLink) {
+    webApp.openTelegramLink(url)
+    return
+  }
+
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 }
