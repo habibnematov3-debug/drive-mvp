@@ -33,7 +33,13 @@ function verifyInitData(initData) {
     .update(dataCheckString)
     .digest('hex')
 
-  if (computedHash !== hash) {
+  const receivedHashBuffer = Buffer.from(hash, 'hex')
+  const computedHashBuffer = Buffer.from(computedHash, 'hex')
+
+  if (
+    receivedHashBuffer.length !== computedHashBuffer.length ||
+    !crypto.timingSafeEqual(receivedHashBuffer, computedHashBuffer)
+  ) {
     throw new Error('initData signature is invalid')
   }
 

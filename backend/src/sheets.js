@@ -33,6 +33,33 @@ const USERS_HEADERS = [
 
 let sheetsClient = null
 
+async function ensureSheetExists(sheetName) {
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId })
+  const existingTitles =
+    spreadsheet.data.sheets?.map((sheet) => sheet.properties?.title).filter(Boolean) || []
+
+  if (existingTitles.includes(sheetName)) {
+    return
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          addSheet: {
+            properties: {
+              title: sheetName,
+            },
+          },
+        },
+      ],
+    },
+  })
+}
+
 function formatGenderLabel(passengerGender) {
   if (passengerGender === 'male') return 'Erkak'
   if (passengerGender === 'female') return 'Ayol'
@@ -71,6 +98,7 @@ async function getSheetsClient() {
 }
 
 async function getNextBookingId(sheets, spreadsheetId) {
+  await ensureSheetExists(BOOKINGS_SHEET_NAME)
   const readRes = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: `${BOOKINGS_SHEET_NAME}!A:A`,
@@ -121,6 +149,7 @@ async function appendBooking(bookingData) {
 }
 
 async function ensureSheetHeader(sheetName, headers) {
+  await ensureSheetExists(sheetName)
   const sheets = await getSheetsClient()
   const spreadsheetId = process.env.GOOGLE_SHEET_ID
 
@@ -150,6 +179,7 @@ function normalizeUserField(value) {
 }
 
 async function upsertTelegramUser(user) {
+  await ensureSheetExists(USERS_SHEET_NAME)
   const sheets = await getSheetsClient()
   const spreadsheetId = process.env.GOOGLE_SHEET_ID
   const telegramUserId = String(user.id)
@@ -274,6 +304,7 @@ function buildRowObject(headers, row) {
 }
 
 async function listBookingsByTelegramUser(telegramUserId) {
+  await ensureSheetExists(BOOKINGS_SHEET_NAME)
   const sheets = await getSheetsClient()
   const spreadsheetId = process.env.GOOGLE_SHEET_ID
   const res = await sheets.spreadsheets.values.get({
