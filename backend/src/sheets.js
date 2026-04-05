@@ -18,6 +18,7 @@ const BOOKINGS_HEADERS = [
   'narx',
   'telegram_user_id',
   'full_car',
+  'has_bag',
   'passenger_gender',
   'route_id',
 ]
@@ -128,6 +129,7 @@ async function appendBooking(bookingData) {
     narx: '',
     telegram_user_id: bookingData.telegram_user_id || '',
     full_car: bookingData.full_car ? 'true' : 'false',
+    has_bag: bookingData.has_bag ? 'true' : 'false',
     passenger_gender: bookingData.passenger_gender || 'any',
     route_id: bookingData.route_id || '',
   }
@@ -338,6 +340,7 @@ async function listBookingsByTelegramUser(telegramUserId) {
         time: row.vaqt || '',
         passengerCount: Number(row.joylar_soni || 1),
         fullCar: parseFullCar(row.full_car, comment),
+        hasBag: parseBoolean(row.has_bag),
         passengerGender: parsePassengerGender(row.passenger_gender, comment),
         status: mapStatus(row.holat),
         comment: parseComment(comment) || undefined,

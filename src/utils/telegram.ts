@@ -52,21 +52,19 @@ export function getTelegramInitData() {
 }
 
 export function buildTelegramAuthHeaders(devTelegramUserId?: string) {
+  const headers: Record<string, string> = {}
   const initData = getTelegramInitData()
 
   if (initData) {
-    return {
-      'X-Telegram-Init-Data': initData,
-    }
+    headers['X-Telegram-Init-Data'] = initData
+    return headers
   }
 
   if (import.meta.env.DEV && devTelegramUserId) {
-    return {
-      'X-Drivee-Dev-User-Id': devTelegramUserId,
-    }
+    headers['X-Drivee-Dev-User-Id'] = devTelegramUserId
   }
 
-  return {}
+  return headers
 }
 
 export function formatTelegramDisplayName(user?: TelegramWebAppUser | null) {

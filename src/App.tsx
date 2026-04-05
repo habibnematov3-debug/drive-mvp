@@ -101,6 +101,8 @@ export default function App() {
     async function bootstrap() {
       setAuthState('loading')
       setAuthError(null)
+      setOrders([])
+      setPassenger(null)
       setIsOrdersLoading(false)
 
       try {
@@ -135,27 +137,27 @@ export default function App() {
           setPassenger(nextPassenger)
           setAuthState('ready')
         }
-
-        setIsOrdersLoading(true)
-
-        try {
-          await loadOrders(isDevBypass ? mockUser.telegramUserId : undefined)
-        } catch (ordersError) {
-          if (!controller.signal.aborted) {
-            setOrders([])
-            setToast(
-              ordersError instanceof Error
-                ? ordersError.message
-                : "Arizalar ro'yxatini yuklab bo'lmadi",
-            )
-          }
-        }
       } catch (error) {
         if (controller.signal.aborted) return
         setPassenger(null)
         setOrders([])
         setAuthState('error')
         setAuthError(formatAuthError(error))
+        return
+      }
+
+      setIsOrdersLoading(true)
+      try {
+        await loadOrders(isDevBypass ? mockUser.telegramUserId : undefined)
+      } catch (ordersError) {
+        if (!controller.signal.aborted) {
+          setOrders([])
+          setToast(
+            ordersError instanceof Error
+              ? ordersError.message
+              : "Arizalar ro'yxatini yuklab bo'lmadi",
+          )
+        }
       } finally {
         if (!controller.signal.aborted) {
           setIsOrdersLoading(false)

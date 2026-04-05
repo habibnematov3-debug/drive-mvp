@@ -79,6 +79,7 @@ function normalizeBookingInput(body = {}) {
       pickFirst(body.seats, body.passenger_count, body.passengerCount, body.joylar_soni),
     ),
     full_car: normalizeBoolean(pickFirst(body.full_car, body.fullCar)),
+    has_bag: normalizeBoolean(pickFirst(body.has_bag, body.hasBag, body.bag)),
     passenger_gender: normalizeString(
       pickFirst(
         body.passenger_gender,

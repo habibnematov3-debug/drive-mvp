@@ -15,6 +15,7 @@ export interface RideRequest {
   passengerCount: number
   fullCar: boolean
   passengerGender: PassengerGender
+  hasBag?: boolean
   status: RequestStatus
   comment?: string
   createdAtISO: string
@@ -28,6 +29,7 @@ export interface RequestFormData {
   passengerCount: number
   fullCar: boolean
   passengerGender: PassengerGender
+  hasBag: boolean
   comment?: string
 }
 

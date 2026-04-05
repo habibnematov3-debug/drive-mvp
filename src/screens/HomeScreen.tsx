@@ -62,6 +62,7 @@ export default function HomeScreen({
   const [fullCar, setFullCar] = useState(false)
   const [passengerGender, setPassengerGender] =
     useState<PassengerGender>('any')
+  const [hasBag, setHasBag] = useState(false)
   const [comment, setComment] = useState('')
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -75,6 +76,7 @@ export default function HomeScreen({
     setPassengerCount(1)
     setFullCar(false)
     setPassengerGender('any')
+    setHasBag(false)
     setComment('')
     setSubmitError(null)
   }
@@ -102,6 +104,7 @@ export default function HomeScreen({
       passengerCount,
       fullCar,
       passengerGender,
+      hasBag,
       comment: comment.trim() ? comment.trim() : undefined,
     }
 
@@ -131,6 +134,7 @@ export default function HomeScreen({
           passenger_phone: normalizedPhone,
           seats: passengerCount,
           full_car: fullCar,
+          has_bag: hasBag,
           passenger_gender: passengerGender,
           comment: requestPayload.comment ?? '',
           ...(passengerName ? { passenger_name: passengerName } : {}),
@@ -240,6 +244,17 @@ export default function HomeScreen({
           value={passengerCount}
           onChange={setPassengerCount}
         />
+
+        <div className="mt-5 border-t border-brand-line pt-5">
+          <ToggleSwitch
+            checked={hasBag}
+            onChange={setHasBag}
+            label="Bagaj bor"
+          />
+          <p className="mt-2 text-xs text-brand-muted">
+            Haydovchi sizda bagaj bor-yoʻqligini bilishi kerak.
+          </p>
+        </div>
 
         <div className="mt-5 border-t border-brand-line pt-5">
           <ToggleSwitch
