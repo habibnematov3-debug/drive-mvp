@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import OrderCard from '../components/OrderCard'
+import { useLanguage } from '../contexts/LanguageContext'
 import type { RideRequest } from '../types/drivee'
 import { formatRequestStatus } from '../utils/format'
 
@@ -9,6 +10,7 @@ type OrdersScreenProps = {
 }
 
 export default function OrdersScreen({ orders, isLoading = false }: OrdersScreenProps) {
+  const { t } = useLanguage()
   const [query, setQuery] = useState('')
 
   const filtered = useMemo(() => {
@@ -27,7 +29,7 @@ export default function OrdersScreen({ orders, isLoading = false }: OrdersScreen
   return (
     <div className="pb-2 pt-1">
       <div className="rounded-[28px] border border-brand-line bg-white p-4 shadow-soft">
-        <div className="mb-2 text-sm font-semibold text-brand-ink">Arizalar</div>
+        <div className="mb-2 text-sm font-semibold text-brand-ink">{t('orders.title')}</div>
         <div className="flex items-center gap-2">
           <svg
             width="18"
@@ -52,7 +54,7 @@ export default function OrdersScreen({ orders, isLoading = false }: OrdersScreen
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ariza, yo'nalish yoki holat"
+            placeholder={t('orders.search')}
             className="flex-1 rounded-[18px] border border-brand-line bg-white px-3 py-3 text-sm text-brand-ink outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
           />
         </div>
@@ -70,13 +72,13 @@ export default function OrdersScreen({ orders, isLoading = false }: OrdersScreen
 
         {!isLoading && filtered.length === 0 ? (
           <div className="bg-white p-4 text-sm text-brand-muted">
-            So'rovingiz bo'yicha arizalar topilmadi.
+            {t('orders.notFound')}
           </div>
         ) : null}
 
         {isLoading ? (
           <div className="bg-white p-4 text-sm text-brand-muted">
-            Arizalar yuklanmoqda...
+            {t('orders.loading')}
           </div>
         ) : null}
       </div>

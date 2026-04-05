@@ -1,20 +1,22 @@
+import { useLanguage } from '../contexts/LanguageContext'
 import type { RequestStatus, RideRequest } from '../types/drivee'
 import {
   formatDateUz,
   formatPassengerGender,
   formatPassengerCount,
-  formatRequestStatus,
 } from '../utils/format'
 
 type OrderCardProps = {
   order: RideRequest
 }
 
-function StatusBadge({ status }: { status: RequestStatus }) {
+function StatusBadge({ status, t }: { status: RequestStatus; t: (key: string) => string }) {
+  const statusText = status === 'submitted' ? t('status.submitted') : status === 'matched' ? t('status.matched') : t('status.cancelled')
+
   if (status === 'submitted') {
     return (
       <span className="inline-flex items-center rounded-full bg-brand-blue-soft px-2.5 py-1 text-xs font-bold text-brand-blue">
-        {formatRequestStatus(status)}
+        {statusText}
       </span>
     )
   }
@@ -22,23 +24,24 @@ function StatusBadge({ status }: { status: RequestStatus }) {
   if (status === 'matched') {
     return (
       <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-600">
-        {formatRequestStatus(status)}
+        {statusText}
       </span>
     )
   }
 
   return (
     <span className="inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-bold text-red-600">
-      {formatRequestStatus(status)}
+      {statusText}
     </span>
   )
 }
 
 export default function OrderCard({ order }: OrderCardProps) {
+  const { t } = useLanguage()
   return (
     <article className="bg-transparent px-4 py-4">
       <div className="flex items-start justify-between gap-3">
-        <StatusBadge status={order.status} />
+        <StatusBadge status={order.status} t={t} />
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
@@ -52,28 +55,28 @@ export default function OrderCard({ order }: OrderCardProps) {
 
         {order.passengerPhone ? (
           <div className="text-sm text-brand-ink">
-            <span className="text-xs font-semibold text-brand-muted">Telefon: </span>
+            <span className="text-xs font-semibold text-brand-muted">{t('orders.phone')}: </span>
             <span className="font-semibold">{order.passengerPhone}</span>
           </div>
         ) : null}
 
         <div className="flex flex-wrap gap-2 text-xs font-semibold text-brand-muted">
           <span className="rounded-full bg-brand-soft px-2.5 py-1">
-            {formatPassengerCount(order.passengerCount)}
+            {formatPassengerCount(order.passengerCount, t)}
           </span>
           {order.fullCar ? (
             <span className="rounded-full bg-brand-soft px-2.5 py-1">
-              To'liq mashina
+              {t('orders.fullCar')}
             </span>
           ) : null}
           {order.hasBag ? (
             <span className="rounded-full bg-brand-soft px-2.5 py-1">
-              Bagaj bor
+              {t('orders.hasBag')}
             </span>
           ) : null}
           {order.passengerGender !== 'any' ? (
             <span className="rounded-full bg-brand-soft px-2.5 py-1">
-              {formatPassengerGender(order.passengerGender)}
+              {formatPassengerGender(order.passengerGender, t)}
             </span>
           ) : null}
         </div>
@@ -85,7 +88,7 @@ export default function OrderCard({ order }: OrderCardProps) {
         ) : null}
 
         <div className="pt-1 text-xs text-brand-muted">
-          Ariza: <span className="font-semibold text-brand-ink">{order.id}</span>
+          {t('orders.bookingId')}: <span className="font-semibold text-brand-ink">{order.id}</span>
         </div>
       </div>
     </article>

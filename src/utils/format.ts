@@ -53,14 +53,22 @@ export function getDefaultTimeValue() {
   return `${hh}:${mm}`
 }
 
-export function formatPassengerCount(count: number) {
-  return `${count} yo'lovchi`
+export function formatPassengerCount(count: number, t?: (key: string) => string) {
+  const label = t ? t('home.passengerSingle') : "yo'lovchi"
+  const suffix = count === 1 ? label : (t ? t('home.passengerPlural') : "yo'lovchilar")
+  return `${count} ${suffix}`
 }
 
-export function formatPassengerGender(gender: PassengerGender) {
-  if (gender === 'male') return 'Erkak'
-  if (gender === 'female') return 'Ayol'
-  return "Farqi yo'q"
+export function formatPassengerGender(gender: PassengerGender, t?: (key: string) => string) {
+  if (!t) {
+    // Fallback to hardcoded Uzbek for backward compatibility
+    if (gender === 'male') return 'Erkak'
+    if (gender === 'female') return 'Ayol'
+    return "Farqi yo'q"
+  }
+  if (gender === 'male') return t('home.male')
+  if (gender === 'female') return t('home.female')
+  return t('home.noPreference')
 }
 
 export function formatRequestStatus(status: RequestStatus) {

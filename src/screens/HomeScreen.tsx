@@ -5,6 +5,7 @@ import PassengerCountSelector from '../components/PassengerCountSelector'
 import RouteSelector from '../components/RouteSelector'
 import TimePicker from '../components/TimePicker'
 import ToggleSwitch from '../components/ToggleSwitch'
+import { useLanguage } from '../contexts/LanguageContext'
 import { routeLabels } from '../data/mock'
 import type {
   PassengerGender,
@@ -54,6 +55,7 @@ export default function HomeScreen({
   passengerName,
   telegramUserId,
 }: HomeScreenProps) {
+  const { t } = useLanguage()
   const [routeId, setRouteId] = useState<RouteId>('kokand-tashkent')
   const [dateISO, setDateISO] = useState(getTodayISO())
   const [time, setTime] = useState(getDefaultTimeValue())
@@ -87,12 +89,12 @@ export default function HomeScreen({
     const normalizedPhone = normalizePhoneNumber(passengerPhone)
 
     if (!normalizedPhone) {
-      setSubmitError('Telefon raqamini kiriting')
+      setSubmitError(t('home.phoneRequired'))
       return
     }
 
     if (!PHONE_REGEX.test(normalizedPhone)) {
-      setSubmitError("Telefon raqami +998901234567 formatida bo'lishi kerak")
+      setSubmitError(t('home.phoneFormat'))
       return
     }
 
@@ -175,7 +177,7 @@ export default function HomeScreen({
       setIsSubmitted(true)
     } catch (error) {
       setSubmitError(
-        error instanceof Error ? error.message : "So'rov yuborilmadi",
+        error instanceof Error ? error.message : t('home.submit'),
       )
     } finally {
       setIsSubmitting(false)
@@ -195,10 +197,10 @@ export default function HomeScreen({
             <SuccessIcon />
           </div>
           <h2 className="mt-5 text-[1.75rem] font-bold leading-tight text-brand-ink">
-            Arizangiz qabul qilindi
+            {t('home.bookingSuccess')}
           </h2>
           <p className="mt-3 text-sm leading-6 text-brand-muted">
-            Tez orada sizga mos haydovchini topib, tasdiqlaymiz.
+            {t('home.bookingSuccessDesc')}
           </p>
 
           <button
@@ -206,7 +208,7 @@ export default function HomeScreen({
             onClick={handleReset}
             className="mt-6 w-full rounded-[24px] bg-brand-blue py-4 text-base font-semibold text-white transition hover:brightness-[1.02] focus:outline-none focus:ring-4 focus:ring-brand-blue/10"
           >
-            Yana ariza qoldirish
+            {t('home.newBooking')}
           </button>
         </section>
       </div>
@@ -224,7 +226,7 @@ export default function HomeScreen({
       <section className="mt-4 rounded-[32px] border border-brand-line bg-white p-4 shadow-soft">
         <div>
           <label className="block text-[1.05rem] font-semibold text-brand-ink">
-            Telefon raqami
+            {t('home.phone')}
           </label>
           <input
             value={passengerPhone}
@@ -236,7 +238,7 @@ export default function HomeScreen({
             placeholder="+998901234567"
           />
           <p className="mt-2 text-xs text-brand-muted">
-            Haydovchi bog&apos;lanishi uchun telefon raqamingiz kerak.
+            {t('home.phoneHelper')}
           </p>
         </div>
 
@@ -249,10 +251,10 @@ export default function HomeScreen({
           <ToggleSwitch
             checked={hasBag}
             onChange={setHasBag}
-            label="Bagaj bor"
+            label={t('home.hasBagLabel')}
           />
           <p className="mt-2 text-xs text-brand-muted">
-            Haydovchi sizda bagaj bor-yoʻqligini bilishi kerak.
+            {t('home.bagHelper')}
           </p>
         </div>
 
@@ -260,7 +262,7 @@ export default function HomeScreen({
           <ToggleSwitch
             checked={fullCar}
             onChange={setFullCar}
-            label="Barcha o'rindiqlarni band qilish"
+            label={t('home.fullCarLabel')}
           />
         </div>
 
@@ -273,14 +275,14 @@ export default function HomeScreen({
 
         <div className="mt-5 border-t border-brand-line pt-5">
           <label className="block text-[1.05rem] font-semibold text-brand-ink">
-            Izoh
+            {t('home.comment')}
           </label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             rows={4}
             className="mt-3 w-full resize-none rounded-[22px] border border-brand-line bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-            placeholder="Arizaga izoh qoldiring..."
+            placeholder={t('home.commentPlaceholder')}
           />
         </div>
 
@@ -296,7 +298,7 @@ export default function HomeScreen({
           disabled={isSubmitting}
           className="mt-6 w-full rounded-[24px] bg-brand-blue py-4 text-base font-semibold text-white transition hover:brightness-[1.02] disabled:cursor-not-allowed disabled:opacity-70 focus:outline-none focus:ring-4 focus:ring-brand-blue/10"
         >
-          {isSubmitting ? 'Yuborilmoqda...' : 'Ariza qoldirish'}
+          {isSubmitting ? t('home.submitting') : t('home.submit')}
         </button>
       </section>
     </div>

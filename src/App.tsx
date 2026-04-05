@@ -7,6 +7,7 @@ import OrdersScreen from './screens/OrdersScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import type { Passenger, RequestFormData, RideRequest, TabKey } from './types/drivee'
 import { getApiBaseUrl } from './utils/api'
+import { useLanguage } from './contexts/LanguageContext'
 import {
   buildTelegramAuthHeaders,
   buildPassengerFromTelegram,
@@ -19,19 +20,8 @@ import {
 
 type AuthState = 'loading' | 'ready' | 'telegram_required' | 'error'
 
-function formatAuthError(error: unknown) {
-  if (error instanceof TypeError && error.message === 'Failed to fetch') {
-    return "Server bilan bog'lanib bo'lmadi. Qayta urinib ko'ring."
-  }
-
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  return "Telegram profilini yuklab bo'lmadi"
-}
-
 export default function App() {
+  const { t } = useLanguage()
   const [tab, setTab] = useState<TabKey>('home')
   const [orders, setOrders] = useState<RideRequest[]>([])
   const [passenger, setPassenger] = useState<Passenger | null>(null)
@@ -39,6 +29,16 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [authError, setAuthError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+
+  function formatAuthError(error: unknown) {
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      return t('auth.connectionError')
+    }
+    if (error instanceof Error) {
+      return error.message
+    }
+    return t('auth.failedToLoadProfile')
+  }
 
   useEffect(() => {
     const webApp = getTelegramWebApp()
@@ -53,7 +53,7 @@ export default function App() {
     if (!apiBaseUrl) {
       setPassenger(null)
       setAuthState('error')
-      setAuthError('VITE_API_BASE_URL sozlanmagan')
+      setAuthError(t('auth.connectionError'))
       return
     }
 
@@ -78,7 +78,7 @@ export default function App() {
       const contentType = requestsResponse.headers.get('content-type') ?? ''
 
       if (!contentType.includes('application/json')) {
-        throw new Error("Arizalar ro'yxatini yuklab bo'lmadi")
+        throw new Error(t('orders.loading'))
       }
 
       const result = JSON.parse(responseBody) as {
@@ -92,7 +92,7 @@ export default function App() {
         !result.success ||
         !Array.isArray(result.requests)
       ) {
-        throw new Error(result.error || "Arizalar ro'yxatini yuklab bo'lmadi")
+        throw new Error(result.error || t('orders.loading'))
       }
 
       setOrders(result.requests)
@@ -120,7 +120,7 @@ export default function App() {
           const authContentType = authResponse.headers.get('content-type') ?? ''
 
           if (!authContentType.includes('application/json')) {
-            throw new Error("Telegram profilini tekshirib bo'lmadi")
+            throw new Error(t('auth.failedToLoadProfile'))
           }
 
           const authResult = JSON.parse(authBody) as {
@@ -130,7 +130,7 @@ export default function App() {
           }
 
           if (!authResponse.ok || !authResult.success || !authResult.user?.id) {
-            throw new Error(authResult.error || "Telegram profilini tekshirib bo'lmadi")
+            throw new Error(authResult.error || t('auth.failedToLoadProfile'))
           }
 
           const nextPassenger = buildPassengerFromTelegram(authResult.user)
@@ -155,7 +155,7 @@ export default function App() {
           setToast(
             ordersError instanceof Error
               ? ordersError.message
-              : "Arizalar ro'yxatini yuklab bo'lmadi",
+              : t('orders.loading'),
           )
         }
       } finally {
@@ -168,7 +168,7 @@ export default function App() {
     bootstrap()
 
     return () => controller.abort()
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (!toast) return
