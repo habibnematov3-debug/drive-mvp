@@ -101,6 +101,10 @@ async function getSheetsClient() {
 }
 
 function createBookingId() {
+  if (typeof crypto.randomUUID === 'function') {
+    return `AR-${crypto.randomUUID().toUpperCase()}`
+  }
+
   return `AR-${Date.now().toString(36).toUpperCase()}-${crypto
     .randomBytes(3)
     .toString('hex')
@@ -291,6 +295,11 @@ function mapStatus(status) {
   return 'submitted'
 }
 
+const ROUTE_LABELS_BY_ID = {
+  'kokand-tashkent': 'Kokand → Tashkent',
+  'tashkent-kokand': 'Tashkent → Kokand',
+}
+
 function mapRouteId(routeLabel) {
   if (routeLabel === 'Kokand → Tashkent') return 'kokand-tashkent'
   if (routeLabel === 'Tashkent → Kokand') return 'tashkent-kokand'
@@ -327,10 +336,12 @@ async function listBookingsByTelegramUser(telegramUserId) {
     .map((row) => buildRowObject(headers, row))
     .filter((row) => String(row.telegram_user_id || '').trim() === String(telegramUserId))
     .map((row) => {
-      const routeLabel = row.yonalish || ''
+      const routeId = row.route_id || mapRouteId(row.yonalish || '')
       const comment = row.izoh || ''
 
-      const routeId = row.route_id || mapRouteId(routeLabel)
+      const routeLabel = routeId
+        ? ROUTE_LABELS_BY_ID[routeId]
+        : row.yonalish || ''
 
       return {
         id: normalizeBookingId(row.buyurtma_id),

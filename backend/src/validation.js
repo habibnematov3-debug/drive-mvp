@@ -1,6 +1,6 @@
 const ROUTE_LABELS_BY_ID = {
-  'kokand-tashkent': 'Kokand в†’ Tashkent',
-  'tashkent-kokand': 'Tashkent в†’ Kokand',
+  'kokand-tashkent': 'Kokand → Tashkent',
+  'tashkent-kokand': 'Tashkent → Kokand',
 }
 
 const VALID_ROUTE_IDS = Object.keys(ROUTE_LABELS_BY_ID)
@@ -24,19 +24,19 @@ function normalizeRouteId(routeId) {
 
 function normalizeRouteLabel(route) {
   const normalized = normalizeString(route)
-    .replace(/->/g, 'в†’')
+    .replace(/->/g, '→')
     .replace(/\s+/g, ' ')
     .trim()
 
   if (
-    normalized.toLowerCase() === 'kokand в†’ tashkent' ||
+    normalized.toLowerCase() === 'kokand → tashkent' ||
     normalized.toLowerCase() === 'kokand tashkent'
   ) {
     return ROUTE_LABELS_BY_ID['kokand-tashkent']
   }
 
   if (
-    normalized.toLowerCase() === 'tashkent в†’ kokand' ||
+    normalized.toLowerCase() === 'tashkent → kokand' ||
     normalized.toLowerCase() === 'tashkent kokand'
   ) {
     return ROUTE_LABELS_BY_ID['tashkent-kokand']
@@ -89,7 +89,6 @@ function normalizeBookingInput(body = {}) {
       ),
     ) || 'any',
     comment: normalizeString(pickFirst(body.comment, body.izoh)),
-    telegram_user_id: pickFirst(body.telegram_user_id, body.telegramUserId),
   }
 }
 

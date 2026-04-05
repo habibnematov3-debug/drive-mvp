@@ -59,6 +59,11 @@ export default function OrderCard({ order }: OrderCardProps) {
               To'liq mashina
             </span>
           ) : null}
+          {order.hasBag ? (
+            <span className="rounded-full bg-brand-soft px-2.5 py-1">
+              Bagaj bor
+            </span>
+          ) : null}
           {order.passengerGender !== 'any' ? (
             <span className="rounded-full bg-brand-soft px-2.5 py-1">
               {formatPassengerGender(order.passengerGender)}
