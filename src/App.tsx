@@ -18,6 +18,18 @@ import {
 
 type AuthState = 'loading' | 'ready' | 'telegram_required' | 'error'
 
+function formatAuthError(error: unknown) {
+  if (error instanceof TypeError && error.message === 'Failed to fetch') {
+    return "Server bilan bog'lanib bo'lmadi. Qayta urinib ko'ring."
+  }
+
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return "Telegram profilini yuklab bo'lmadi"
+}
+
 export default function App() {
   const [tab, setTab] = useState<TabKey>('home')
   const [orders, setOrders] = useState<RideRequest[]>([])
@@ -130,11 +142,7 @@ export default function App() {
         setPassenger(null)
         setOrders([])
         setAuthState('error')
-        setAuthError(
-          error instanceof Error
-            ? error.message
-            : "Telegram profilini yuklab bo'lmadi",
-        )
+        setAuthError(formatAuthError(error))
       } finally {
         if (!controller.signal.aborted) {
           setIsOrdersLoading(false)
@@ -201,15 +209,19 @@ export default function App() {
       >
         {authState !== 'ready' || !passenger ? (
           <AuthScreen
-            isLoading={authState === 'loading'}
+            authState={authState}
             errorMessage={authError}
-            canOpenTelegram={Boolean(import.meta.env.VITE_TELEGRAM_BOT_URL?.trim())}
+            canOpenTelegram={
+              authState === 'telegram_required' &&
+              Boolean(import.meta.env.VITE_TELEGRAM_BOT_URL?.trim())
+            }
             onOpenTelegram={() => {
               const supportUrl = import.meta.env.VITE_TELEGRAM_BOT_URL?.trim()
               if (supportUrl) {
                 openTelegramUrl(supportUrl)
               }
             }}
+            onRetry={() => window.location.reload()}
           />
         ) : tab === 'home' ? (
           <HomeScreen
