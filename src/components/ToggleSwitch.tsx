@@ -24,10 +24,12 @@ export default function ToggleSwitch({
   onChange,
 }: ToggleSwitchProps) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-3 text-brand-ink">
+    <div className="flex items-start justify-between gap-3 sm:items-center">
+      <div className="flex min-w-0 items-start gap-3 text-brand-ink">
         <CheckIcon />
-        <div className="text-[1.05rem] font-semibold">{label}</div>
+        <div className="min-w-0 text-[1.05rem] font-semibold leading-6">
+          {label}
+        </div>
       </div>
 
       <button
@@ -36,8 +38,8 @@ export default function ToggleSwitch({
         aria-pressed={checked}
         className={
           checked
-            ? 'relative h-8 w-14 rounded-full bg-brand-blue transition'
-            : 'relative h-8 w-14 rounded-full bg-brand-soft transition'
+            ? 'relative h-8 w-14 shrink-0 rounded-full bg-brand-blue transition'
+            : 'relative h-8 w-14 shrink-0 rounded-full bg-brand-soft transition'
         }
       >
         <span

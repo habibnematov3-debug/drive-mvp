@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 const { google } = require('googleapis')
 
 const BOOKINGS_SHEET_NAME = 'bookings'
@@ -18,6 +19,7 @@ const BOOKINGS_HEADERS = [
   'telegram_user_id',
   'full_car',
   'passenger_gender',
+  'route_id',
 ]
 const USERS_SHEET_NAME = 'users'
 const USERS_HEADERS = [
@@ -97,21 +99,17 @@ async function getSheetsClient() {
   return sheetsClient
 }
 
-async function getNextBookingId(sheets, spreadsheetId) {
-  await ensureSheetExists(BOOKINGS_SHEET_NAME)
-  const readRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${BOOKINGS_SHEET_NAME}!A:A`,
-  })
-
-  const existingRows = readRes.data.values || []
-  return existingRows.length
+function createBookingId() {
+  return `AR-${Date.now().toString(36).toUpperCase()}-${crypto
+    .randomBytes(3)
+    .toString('hex')
+    .toUpperCase()}`
 }
 
 async function appendBooking(bookingData) {
   const sheets = await getSheetsClient()
   const spreadsheetId = process.env.GOOGLE_SHEET_ID
-  const bookingId = await getNextBookingId(sheets, spreadsheetId)
+  const bookingId = createBookingId()
   const createdAt = new Date().toISOString()
 
   const rowData = {
@@ -131,6 +129,7 @@ async function appendBooking(bookingData) {
     telegram_user_id: bookingData.telegram_user_id || '',
     full_car: bookingData.full_car ? 'true' : 'false',
     passenger_gender: bookingData.passenger_gender || 'any',
+    route_id: bookingData.route_id || '',
   }
 
   const row = BOOKINGS_HEADERS.map((header) => rowData[header] ?? '')
@@ -296,6 +295,13 @@ function mapRouteId(routeLabel) {
   return null
 }
 
+function normalizeBookingId(value) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return ''
+  if (normalized.startsWith('AR-')) return normalized
+  return `AR-${normalized}`
+}
+
 function buildRowObject(headers, row) {
   return headers.reduce((acc, header, index) => {
     acc[header] = row[index] ?? ''
@@ -322,9 +328,11 @@ async function listBookingsByTelegramUser(telegramUserId) {
       const routeLabel = row.yonalish || ''
       const comment = row.izoh || ''
 
+      const routeId = row.route_id || mapRouteId(routeLabel)
+
       return {
-        id: `AR-${row.buyurtma_id}`,
-        routeId: mapRouteId(routeLabel),
+        id: normalizeBookingId(row.buyurtma_id),
+        routeId,
         routeLabel,
         dateISO: row.sana || '',
         time: row.vaqt || '',

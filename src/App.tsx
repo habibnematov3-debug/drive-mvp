@@ -8,6 +8,7 @@ import ProfileScreen from './screens/ProfileScreen'
 import type { Passenger, RequestFormData, RideRequest, TabKey } from './types/drivee'
 import { getApiBaseUrl } from './utils/api'
 import {
+  buildTelegramAuthHeaders,
   buildPassengerFromTelegram,
   closeTelegramMiniApp,
   getTelegramInitData,
@@ -68,11 +69,11 @@ export default function App() {
 
     const controller = new AbortController()
 
-    async function loadOrders(telegramUserId: string) {
-      const requestsResponse = await fetch(
-        `${apiBaseUrl}/requests?telegram_user_id=${encodeURIComponent(telegramUserId)}`,
-        { signal: controller.signal },
-      )
+    async function loadOrders(devTelegramUserId?: string) {
+      const requestsResponse = await fetch(`${apiBaseUrl}/requests`, {
+        signal: controller.signal,
+        headers: buildTelegramAuthHeaders(devTelegramUserId),
+      })
       const responseBody = await requestsResponse.text()
       const contentType = requestsResponse.headers.get('content-type') ?? ''
 
@@ -99,44 +100,56 @@ export default function App() {
 
     async function bootstrap() {
       setAuthState('loading')
-      setIsOrdersLoading(true)
       setAuthError(null)
+      setIsOrdersLoading(false)
 
       try {
         if (isDevBypass) {
           setPassenger(mockUser)
-          await loadOrders(mockUser.telegramUserId || '')
           setAuthState('ready')
-          return
+        } else {
+          const authResponse = await fetch(`${apiBaseUrl}/auth/telegram`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData }),
+            signal: controller.signal,
+          })
+          const authBody = await authResponse.text()
+          const authContentType = authResponse.headers.get('content-type') ?? ''
+
+          if (!authContentType.includes('application/json')) {
+            throw new Error("Telegram profilini tekshirib bo'lmadi")
+          }
+
+          const authResult = JSON.parse(authBody) as {
+            success?: boolean
+            error?: string
+            user?: Parameters<typeof buildPassengerFromTelegram>[0]
+          }
+
+          if (!authResponse.ok || !authResult.success || !authResult.user?.id) {
+            throw new Error(authResult.error || "Telegram profilini tekshirib bo'lmadi")
+          }
+
+          const nextPassenger = buildPassengerFromTelegram(authResult.user)
+          setPassenger(nextPassenger)
+          setAuthState('ready')
         }
 
-        const authResponse = await fetch(`${apiBaseUrl}/auth/telegram`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData }),
-          signal: controller.signal,
-        })
-        const authBody = await authResponse.text()
-        const authContentType = authResponse.headers.get('content-type') ?? ''
+        setIsOrdersLoading(true)
 
-        if (!authContentType.includes('application/json')) {
-          throw new Error("Telegram profilini tekshirib bo'lmadi")
+        try {
+          await loadOrders(isDevBypass ? mockUser.telegramUserId : undefined)
+        } catch (ordersError) {
+          if (!controller.signal.aborted) {
+            setOrders([])
+            setToast(
+              ordersError instanceof Error
+                ? ordersError.message
+                : "Arizalar ro'yxatini yuklab bo'lmadi",
+            )
+          }
         }
-
-        const authResult = JSON.parse(authBody) as {
-          success?: boolean
-          error?: string
-          user?: Parameters<typeof buildPassengerFromTelegram>[0]
-        }
-
-        if (!authResponse.ok || !authResult.success || !authResult.user?.id) {
-          throw new Error(authResult.error || "Telegram profilini tekshirib bo'lmadi")
-        }
-
-        const nextPassenger = buildPassengerFromTelegram(authResult.user)
-        setPassenger(nextPassenger)
-        await loadOrders(String(authResult.user.id))
-        setAuthState('ready')
       } catch (error) {
         if (controller.signal.aborted) return
         setPassenger(null)
@@ -162,9 +175,9 @@ export default function App() {
     return () => window.clearTimeout(timeoutId)
   }, [toast])
 
-  function addOrder(request: RequestFormData) {
+  function addOrder(request: RequestFormData, bookingId: string) {
     const nextOrder: RideRequest = {
-      id: `AR-${Date.now()}`,
+      id: bookingId,
       routeId: request.routeId,
       routeLabel: routeLabels[request.routeId],
       dateISO: request.dateISO,

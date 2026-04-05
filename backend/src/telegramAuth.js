@@ -79,4 +79,56 @@ function verifyInitData(initData) {
   }
 }
 
-module.exports = { verifyInitData }
+function getInitDataFromRequest(req) {
+  const headerValue = req.get('x-telegram-init-data')
+  if (typeof headerValue === 'string' && headerValue.trim()) {
+    return headerValue.trim()
+  }
+
+  const bodyValue = req.body?.initData
+  if (typeof bodyValue === 'string' && bodyValue.trim()) {
+    return bodyValue.trim()
+  }
+
+  return ''
+}
+
+function getDevUser(req) {
+  if (process.env.NODE_ENV === 'production') {
+    return null
+  }
+
+  const devUserId = req.get('x-drivee-dev-user-id')
+  if (!devUserId) {
+    return null
+  }
+
+  return {
+    id: String(devUserId).trim(),
+    first_name: 'Local',
+    last_name: 'Test User',
+    username: 'drivee_dev',
+  }
+}
+
+function requireTelegramUser(req, res, next) {
+  try {
+    const devUser = getDevUser(req)
+
+    if (devUser) {
+      req.telegramUser = devUser
+      return next()
+    }
+
+    const { user } = verifyInitData(getInitDataFromRequest(req))
+    req.telegramUser = user
+    return next()
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      error: error.message || 'Telegram authentication failed',
+    })
+  }
+}
+
+module.exports = { verifyInitData, requireTelegramUser }

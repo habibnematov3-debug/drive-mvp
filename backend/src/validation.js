@@ -1,4 +1,9 @@
-const VALID_ROUTES = ['Kokand → Tashkent', 'Tashkent → Kokand']
+const ROUTE_LABELS_BY_ID = {
+  'kokand-tashkent': 'Kokand в†’ Tashkent',
+  'tashkent-kokand': 'Tashkent в†’ Kokand',
+}
+
+const VALID_ROUTE_IDS = Object.keys(ROUTE_LABELS_BY_ID)
 const VALID_GENDERS = ['any', 'male', 'female']
 const PHONE_REGEX = /^\+998\d{9}$/
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
@@ -12,24 +17,29 @@ function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function normalizeRoute(route) {
+function normalizeRouteId(routeId) {
+  const normalized = normalizeString(routeId).toLowerCase()
+  return VALID_ROUTE_IDS.includes(normalized) ? normalized : ''
+}
+
+function normalizeRouteLabel(route) {
   const normalized = normalizeString(route)
-    .replace(/->/g, '→')
+    .replace(/->/g, 'в†’')
     .replace(/\s+/g, ' ')
     .trim()
 
   if (
-    normalized.toLowerCase() === 'kokand → tashkent' ||
+    normalized.toLowerCase() === 'kokand в†’ tashkent' ||
     normalized.toLowerCase() === 'kokand tashkent'
   ) {
-    return 'Kokand → Tashkent'
+    return ROUTE_LABELS_BY_ID['kokand-tashkent']
   }
 
   if (
-    normalized.toLowerCase() === 'tashkent → kokand' ||
+    normalized.toLowerCase() === 'tashkent в†’ kokand' ||
     normalized.toLowerCase() === 'tashkent kokand'
   ) {
-    return 'Tashkent → Kokand'
+    return ROUTE_LABELS_BY_ID['tashkent-kokand']
   }
 
   return normalized
@@ -48,8 +58,15 @@ function normalizeBoolean(value) {
 }
 
 function normalizeBookingInput(body = {}) {
+  const routeId = normalizeRouteId(
+    pickFirst(body.route_id, body.routeId, body.yonalish_id),
+  )
+
   return {
-    route: normalizeRoute(body.route),
+    route_id: routeId,
+    route: routeId
+      ? ROUTE_LABELS_BY_ID[routeId]
+      : normalizeRouteLabel(body.route),
     date: normalizeString(body.date),
     time: normalizeString(body.time),
     passenger_name: normalizeString(
@@ -78,10 +95,10 @@ function normalizeBookingInput(body = {}) {
 function validateBookingInput(body) {
   const value = normalizeBookingInput(body)
 
-  if (!value.route || !VALID_ROUTES.includes(value.route)) {
+  if (!value.route_id || !VALID_ROUTE_IDS.includes(value.route_id)) {
     return {
       valid: false,
-      error: `Invalid route. Must be one of: ${VALID_ROUTES.join(', ')}`,
+      error: `route_id must be one of: ${VALID_ROUTE_IDS.join(', ')}`,
     }
   }
 
@@ -104,7 +121,14 @@ function validateBookingInput(body) {
     }
   }
 
-  if (value.passenger_phone && !PHONE_REGEX.test(value.passenger_phone)) {
+  if (!value.passenger_phone) {
+    return {
+      valid: false,
+      error: 'passenger_phone is required',
+    }
+  }
+
+  if (!PHONE_REGEX.test(value.passenger_phone)) {
     return {
       valid: false,
       error: 'Invalid phone. Expected format: +998XXXXXXXXX',
@@ -123,29 +147,6 @@ function validateBookingInput(body) {
   }
 
   return { valid: true, value }
-  
-  function normalizeRoute(route) {
-  const normalized = normalizeString(route)
-    .replace(/->/g, '→')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  if (
-    normalized.toLowerCase() === 'kokand → tashkent' ||
-    normalized.toLowerCase() === 'kokand tashkent'
-  ) {
-    return 'Kokand → Tashkent'
-  }
-
-  if (
-    normalized.toLowerCase() === 'tashkent → kokand' ||
-    normalized.toLowerCase() === 'tashkent kokand'
-  ) {
-    return 'Tashkent → Kokand'
-  }
-
-  return normalized
-}
 }
 
 module.exports = { validateBookingInput }

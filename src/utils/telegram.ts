@@ -51,6 +51,24 @@ export function getTelegramInitData() {
   return getTelegramWebApp()?.initData?.trim() || ''
 }
 
+export function buildTelegramAuthHeaders(devTelegramUserId?: string) {
+  const initData = getTelegramInitData()
+
+  if (initData) {
+    return {
+      'X-Telegram-Init-Data': initData,
+    }
+  }
+
+  if (import.meta.env.DEV && devTelegramUserId) {
+    return {
+      'X-Drivee-Dev-User-Id': devTelegramUserId,
+    }
+  }
+
+  return {}
+}
+
 export function formatTelegramDisplayName(user?: TelegramWebAppUser | null) {
   if (!user) return ''
 

@@ -12,15 +12,27 @@ import type {
   RouteId,
 } from '../types/drivee'
 import { getApiBaseUrl } from '../utils/api'
+import { buildTelegramAuthHeaders } from '../utils/telegram'
 import {
   getDefaultTimeValue,
   getTodayISO,
 } from '../utils/format'
 
 type HomeScreenProps = {
-  onSubmitRequest: (payload: RequestFormData) => void
+  onSubmitRequest: (payload: RequestFormData, bookingId: string) => void
   passengerName?: string
   telegramUserId?: string
+}
+
+const PHONE_REGEX = /^\+998\d{9}$/
+
+function normalizePhoneNumber(value: string) {
+  const digits = value.replace(/\D/g, '')
+
+  if (!digits) return ''
+  if (digits.startsWith('998')) return `+${digits.slice(0, 12)}`
+  if (digits.length <= 9) return `+998${digits}`
+  return `+${digits}`
 }
 
 function SuccessIcon() {
@@ -45,28 +57,48 @@ export default function HomeScreen({
   const [routeId, setRouteId] = useState<RouteId>('kokand-tashkent')
   const [dateISO, setDateISO] = useState(getTodayISO())
   const [time, setTime] = useState(getDefaultTimeValue())
+  const [passengerPhone, setPassengerPhone] = useState('')
   const [passengerCount, setPassengerCount] = useState(1)
   const [fullCar, setFullCar] = useState(false)
   const [passengerGender, setPassengerGender] =
     useState<PassengerGender>('any')
   const [comment, setComment] = useState('')
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   function resetFormState() {
     setRouteId('kokand-tashkent')
     setDateISO(getTodayISO())
     setTime(getDefaultTimeValue())
+    setPassengerPhone('')
     setPassengerCount(1)
     setFullCar(false)
     setPassengerGender('any')
     setComment('')
+    setSubmitError(null)
   }
 
   async function handleSubmit() {
+    if (isSubmitting) return
+
+    const normalizedPhone = normalizePhoneNumber(passengerPhone)
+
+    if (!normalizedPhone) {
+      setSubmitError('Telefon raqamini kiriting')
+      return
+    }
+
+    if (!PHONE_REGEX.test(normalizedPhone)) {
+      setSubmitError("Telefon raqami +998901234567 formatida bo'lishi kerak")
+      return
+    }
+
     const requestPayload: RequestFormData = {
       routeId,
       dateISO,
       time,
+      passengerPhone: normalizedPhone,
       passengerCount,
       fullCar,
       passengerGender,
@@ -74,26 +106,33 @@ export default function HomeScreen({
     }
 
     try {
+      setIsSubmitting(true)
+      setSubmitError(null)
+
       const apiBaseUrl = getApiBaseUrl()
 
       if (!apiBaseUrl) {
         throw new Error(
-          'VITE_API_BASE_URL is not configured. Set it in Netlify and redeploy the frontend.',
+          'VITE_API_BASE_URL is not configured. Set it and redeploy the frontend.',
         )
       }
 
       const response = await fetch(`${apiBaseUrl}/bookings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...buildTelegramAuthHeaders(telegramUserId),
+        },
         body: JSON.stringify({
+          route_id: routeId,
           route: routeLabels[routeId],
           date: dateISO,
           time,
+          passenger_phone: normalizedPhone,
           seats: passengerCount,
           full_car: fullCar,
           passenger_gender: passengerGender,
           comment: requestPayload.comment ?? '',
-          telegram_user_id: telegramUserId,
           ...(passengerName ? { passenger_name: passengerName } : {}),
         }),
       })
@@ -108,7 +147,7 @@ export default function HomeScreen({
         )
       }
 
-      let result: { success?: boolean; error?: string }
+      let result: { success?: boolean; error?: string; booking_id?: string }
 
       try {
         result = JSON.parse(responseBody) as {
@@ -123,12 +162,19 @@ export default function HomeScreen({
         throw new Error(result.error || `Request failed (${statusLabel})`)
       }
 
-      onSubmitRequest(requestPayload)
+      if (!result.booking_id) {
+        throw new Error('booking_id was not returned by the API')
+      }
+
+      onSubmitRequest(requestPayload, result.booking_id)
       resetFormState()
       setIsSubmitted(true)
     } catch (error) {
-      const message = error instanceof Error ? error.message : "So'rov yuborilmadi"
-      alert(message)
+      setSubmitError(
+        error instanceof Error ? error.message : "So'rov yuborilmadi",
+      )
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -172,6 +218,24 @@ export default function HomeScreen({
       </div>
 
       <section className="mt-4 rounded-[32px] border border-brand-line bg-white p-4 shadow-soft">
+        <div>
+          <label className="block text-[1.05rem] font-semibold text-brand-ink">
+            Telefon raqami
+          </label>
+          <input
+            value={passengerPhone}
+            onChange={(e) => setPassengerPhone(e.target.value)}
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            className="mt-3 w-full rounded-[22px] border border-brand-line bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+            placeholder="+998901234567"
+          />
+          <p className="mt-2 text-xs text-brand-muted">
+            Haydovchi bog&apos;lanishi uchun telefon raqamingiz kerak.
+          </p>
+        </div>
+
         <PassengerCountSelector
           value={passengerCount}
           onChange={setPassengerCount}
@@ -205,12 +269,19 @@ export default function HomeScreen({
           />
         </div>
 
+        {submitError ? (
+          <div className="mt-5 rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {submitError}
+          </div>
+        ) : null}
+
         <button
           type="button"
           onClick={handleSubmit}
-          className="mt-6 w-full rounded-[24px] bg-brand-blue py-4 text-base font-semibold text-white transition hover:brightness-[1.02] focus:outline-none focus:ring-4 focus:ring-brand-blue/10"
+          disabled={isSubmitting}
+          className="mt-6 w-full rounded-[24px] bg-brand-blue py-4 text-base font-semibold text-white transition hover:brightness-[1.02] disabled:cursor-not-allowed disabled:opacity-70 focus:outline-none focus:ring-4 focus:ring-brand-blue/10"
         >
-          Ariza qoldirish
+          {isSubmitting ? 'Yuborilmoqda...' : 'Ariza qoldirish'}
         </button>
       </section>
     </div>

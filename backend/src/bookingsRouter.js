@@ -1,22 +1,14 @@
 const express = require('express')
 const { confirmToUser, notifyBookingGroup } = require('./bot')
 const { appendBooking, listBookingsByTelegramUser } = require('./sheets')
+const { requireTelegramUser } = require('./telegramAuth')
 const { validateBookingInput } = require('./validation')
 
 const router = express.Router()
 
-router.get('/', async (req, res) => {
-  const telegramUserId = req.query.telegram_user_id || req.query.telegramUserId
-
-  if (!telegramUserId) {
-    return res.status(400).json({
-      success: false,
-      error: 'telegram_user_id query parameter is required',
-    })
-  }
-
+router.get('/', requireTelegramUser, async (req, res) => {
   try {
-    const requests = await listBookingsByTelegramUser(telegramUserId)
+    const requests = await listBookingsByTelegramUser(String(req.telegramUser.id))
 
     return res.json({
       success: true,
@@ -31,20 +23,33 @@ router.get('/', async (req, res) => {
   }
 })
 
-router.post('/', async (req, res) => {
+router.post('/', requireTelegramUser, async (req, res) => {
   const validation = validateBookingInput(req.body)
   if (!validation.valid) {
     return res.status(400).json({ success: false, error: validation.error })
   }
 
-  const bookingData = validation.value
+  const bookingData = {
+    ...validation.value,
+    telegram_user_id: String(req.telegramUser.id),
+  }
 
   try {
     const bookingId = await appendBooking(bookingData)
-    await notifyBookingGroup(bookingId, bookingData)
+    const warnings = []
 
-    if (bookingData.telegram_user_id) {
+    try {
+      await notifyBookingGroup(bookingId, bookingData)
+    } catch (error) {
+      console.error('[Booking] Group notification failed:', error.message)
+      warnings.push('booking_group_notification_failed')
+    }
+
+    try {
       await confirmToUser(bookingData.telegram_user_id, bookingId, bookingData)
+    } catch (error) {
+      console.error('[Booking] User confirmation failed:', error.message)
+      warnings.push('user_confirmation_failed')
     }
 
     return res.status(201).json({
@@ -52,6 +57,7 @@ router.post('/', async (req, res) => {
       booking_id: bookingId,
       buyurtma_id: bookingId,
       message: 'Arizangiz qabul qilindi',
+      warnings,
     })
   } catch (error) {
     console.error('[Booking] Error processing booking:', error.message)

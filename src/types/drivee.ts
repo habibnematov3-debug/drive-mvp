@@ -24,6 +24,7 @@ export interface RequestFormData {
   routeId: RouteId
   dateISO: string
   time: string
+  passengerPhone: string
   passengerCount: number
   fullCar: boolean
   passengerGender: PassengerGender
