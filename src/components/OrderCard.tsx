@@ -50,6 +50,13 @@ export default function OrderCard({ order }: OrderCardProps) {
           {formatDateUz(order.dateISO)} • {order.time}
         </div>
 
+        {order.passengerPhone ? (
+          <div className="text-sm text-brand-ink">
+            <span className="text-xs font-semibold text-brand-muted">Telefon: </span>
+            <span className="font-semibold">{order.passengerPhone}</span>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2 text-xs font-semibold text-brand-muted">
           <span className="rounded-full bg-brand-soft px-2.5 py-1">
             {formatPassengerCount(order.passengerCount)}

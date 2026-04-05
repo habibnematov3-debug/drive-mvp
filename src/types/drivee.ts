@@ -12,6 +12,7 @@ export interface RideRequest {
   routeLabel: string
   dateISO: string
   time: string
+  passengerPhone?: string
   passengerCount: number
   fullCar: boolean
   passengerGender: PassengerGender

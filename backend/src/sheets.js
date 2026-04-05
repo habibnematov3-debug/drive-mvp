@@ -349,6 +349,7 @@ async function listBookingsByTelegramUser(telegramUserId) {
         routeLabel,
         dateISO: row.sana || '',
         time: row.vaqt || '',
+        passengerPhone: row.telefon || undefined,
         passengerCount: Number(row.joylar_soni || 1),
         fullCar: parseFullCar(row.full_car, comment),
         hasBag: parseBoolean(row.has_bag),
