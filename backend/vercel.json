@@ -1,9 +1,8 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [
+module.exports = {
+  rewrites: async () => [
     {
-      "source": "/(.*)",
-      "destination": "/api/index.js"
-    }
-  ]
+      source: '/:path*',
+      destination: '/api/:path*',
+    },
+  ],
 }
