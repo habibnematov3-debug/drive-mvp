@@ -74,6 +74,7 @@ export function buildPassengerFromTelegram(
       name: '',
       secondaryLine: '',
       languageLabel: '',
+      telegramUserId: '',
     }
   }
 
@@ -91,6 +92,7 @@ export function buildPassengerFromTelegram(
     languageLabel:
       normalizeLanguageLabel(user.language_code) ?? '',
     avatarUrl: user.photo_url,
+    telegramUserId: user.id ? String(user.id) : '',
   }
 }
 

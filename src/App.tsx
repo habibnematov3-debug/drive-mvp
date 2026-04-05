@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { routeLabels } from './data/mock'
+import { mockUser, routeLabels } from './data/mock'
 import AppLayout from './layout/AppLayout'
 import AuthScreen from './screens/AuthScreen'
 import HomeScreen from './screens/HomeScreen'
 import OrdersScreen from './screens/OrdersScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import type { Passenger, RequestFormData, RideRequest, TabKey } from './types/drivee'
+import { getApiBaseUrl } from './utils/api'
 import {
   buildPassengerFromTelegram,
   closeTelegramMiniApp,
@@ -33,16 +34,8 @@ export default function App() {
 
     const telegramUser = getTelegramUser()
     const initData = getTelegramInitData()
-
-    if (!telegramUser?.id || !initData) {
-      setPassenger(null)
-      setOrders([])
-      setAuthState('telegram_required')
-      setIsOrdersLoading(false)
-      return
-    }
-
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '')
+    const isDevBypass = import.meta.env.DEV && (!telegramUser?.id || !initData)
+    const apiBaseUrl = getApiBaseUrl()
 
     if (!apiBaseUrl) {
       setPassenger(null)
@@ -51,7 +44,46 @@ export default function App() {
       return
     }
 
+    if (!telegramUser?.id || !initData) {
+      if (!isDevBypass) {
+        setPassenger(null)
+        setOrders([])
+        setAuthState('telegram_required')
+        setIsOrdersLoading(false)
+        return
+      }
+    }
+
     const controller = new AbortController()
+
+    async function loadOrders(telegramUserId: string) {
+      const requestsResponse = await fetch(
+        `${apiBaseUrl}/requests?telegram_user_id=${encodeURIComponent(telegramUserId)}`,
+        { signal: controller.signal },
+      )
+      const responseBody = await requestsResponse.text()
+      const contentType = requestsResponse.headers.get('content-type') ?? ''
+
+      if (!contentType.includes('application/json')) {
+        throw new Error("Arizalar ro'yxatini yuklab bo'lmadi")
+      }
+
+      const result = JSON.parse(responseBody) as {
+        success?: boolean
+        error?: string
+        requests?: RideRequest[]
+      }
+
+      if (
+        !requestsResponse.ok ||
+        !result.success ||
+        !Array.isArray(result.requests)
+      ) {
+        throw new Error(result.error || "Arizalar ro'yxatini yuklab bo'lmadi")
+      }
+
+      setOrders(result.requests)
+    }
 
     async function bootstrap() {
       setAuthState('loading')
@@ -59,6 +91,13 @@ export default function App() {
       setAuthError(null)
 
       try {
+        if (isDevBypass) {
+          setPassenger(mockUser)
+          await loadOrders(mockUser.telegramUserId || '')
+          setAuthState('ready')
+          return
+        }
+
         const authResponse = await fetch(`${apiBaseUrl}/auth/telegram`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -69,7 +108,7 @@ export default function App() {
         const authContentType = authResponse.headers.get('content-type') ?? ''
 
         if (!authContentType.includes('application/json')) {
-          throw new Error('Telegram profilini tekshirib bo‘lmadi')
+          throw new Error("Telegram profilini tekshirib bo'lmadi")
         }
 
         const authResult = JSON.parse(authBody) as {
@@ -79,38 +118,12 @@ export default function App() {
         }
 
         if (!authResponse.ok || !authResult.success || !authResult.user?.id) {
-          throw new Error(authResult.error || 'Telegram profilini tekshirib bo‘lmadi')
+          throw new Error(authResult.error || "Telegram profilini tekshirib bo'lmadi")
         }
 
         const nextPassenger = buildPassengerFromTelegram(authResult.user)
         setPassenger(nextPassenger)
-
-        const requestsResponse = await fetch(
-          `${apiBaseUrl}/requests?telegram_user_id=${authResult.user.id}`,
-          { signal: controller.signal },
-        )
-        const responseBody = await requestsResponse.text()
-        const contentType = requestsResponse.headers.get('content-type') ?? ''
-
-        if (!contentType.includes('application/json')) {
-          throw new Error('Arizalar ro‘yxatini yuklab bo‘lmadi')
-        }
-
-        const result = JSON.parse(responseBody) as {
-          success?: boolean
-          error?: string
-          requests?: RideRequest[]
-        }
-
-        if (
-          !requestsResponse.ok ||
-          !result.success ||
-          !Array.isArray(result.requests)
-        ) {
-          throw new Error(result.error || 'Arizalar ro‘yxatini yuklab bo‘lmadi')
-        }
-
-        setOrders(result.requests)
+        await loadOrders(String(authResult.user.id))
         setAuthState('ready')
       } catch (error) {
         if (controller.signal.aborted) return
@@ -120,7 +133,7 @@ export default function App() {
         setAuthError(
           error instanceof Error
             ? error.message
-            : 'Telegram profilini yuklab bo‘lmadi',
+            : "Telegram profilini yuklab bo'lmadi",
         )
       } finally {
         if (!controller.signal.aborted) {
@@ -199,7 +212,11 @@ export default function App() {
             }}
           />
         ) : tab === 'home' ? (
-          <HomeScreen onSubmitRequest={addOrder} />
+          <HomeScreen
+            onSubmitRequest={addOrder}
+            passengerName={passenger.name}
+            telegramUserId={passenger.telegramUserId}
+          />
         ) : tab === 'orders' ? (
           <OrdersScreen orders={orders} isLoading={isOrdersLoading} />
         ) : (

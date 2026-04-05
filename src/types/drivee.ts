@@ -35,4 +35,5 @@ export interface Passenger {
   secondaryLine: string
   languageLabel: string
   avatarUrl?: string
+  telegramUserId?: string
 }

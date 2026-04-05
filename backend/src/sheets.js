@@ -133,7 +133,7 @@ async function appendBooking(bookingData) {
     passenger_gender: bookingData.passenger_gender || 'any',
   }
 
-  const row = HEADERS.map((header) => rowData[header] ?? '')
+  const row = BOOKINGS_HEADERS.map((header) => rowData[header] ?? '')
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
@@ -309,7 +309,7 @@ async function listBookingsByTelegramUser(telegramUserId) {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${SHEET_NAME}!A:Z`,
+    range: `${BOOKINGS_SHEET_NAME}!A:Z`,
   })
 
   const rows = res.data.values || []

@@ -6,7 +6,8 @@ export const routeLabels: Record<RouteId, string> = {
 }
 
 export const mockUser: Passenger = {
-  name: 'Madina Karimova',
-  secondaryLine: '+998 90 123-45-67',
+  name: 'Local Test User',
+  secondaryLine: 'Browser development mode',
   languageLabel: "O'zbekcha",
+  telegramUserId: 'dev-local-user',
 }

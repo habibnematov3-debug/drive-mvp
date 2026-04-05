@@ -11,14 +11,16 @@ import type {
   RequestFormData,
   RouteId,
 } from '../types/drivee'
+import { getApiBaseUrl } from '../utils/api'
 import {
   getDefaultTimeValue,
   getTodayISO,
 } from '../utils/format'
-import { formatTelegramDisplayName, getTelegramUser } from '../utils/telegram'
 
 type HomeScreenProps = {
   onSubmitRequest: (payload: RequestFormData) => void
+  passengerName?: string
+  telegramUserId?: string
 }
 
 function SuccessIcon() {
@@ -35,7 +37,11 @@ function SuccessIcon() {
   )
 }
 
-export default function HomeScreen({ onSubmitRequest }: HomeScreenProps) {
+export default function HomeScreen({
+  onSubmitRequest,
+  passengerName,
+  telegramUserId,
+}: HomeScreenProps) {
   const [routeId, setRouteId] = useState<RouteId>('kokand-tashkent')
   const [dateISO, setDateISO] = useState(getTodayISO())
   const [time, setTime] = useState(getDefaultTimeValue())
@@ -67,10 +73,8 @@ export default function HomeScreen({ onSubmitRequest }: HomeScreenProps) {
       comment: comment.trim() ? comment.trim() : undefined,
     }
 
-    const user = getTelegramUser()
-
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '')
+      const apiBaseUrl = getApiBaseUrl()
 
       if (!apiBaseUrl) {
         throw new Error(
@@ -86,11 +90,11 @@ export default function HomeScreen({ onSubmitRequest }: HomeScreenProps) {
           date: dateISO,
           time,
           seats: passengerCount,
+          full_car: fullCar,
+          passenger_gender: passengerGender,
           comment: requestPayload.comment ?? '',
-          telegram_user_id: user?.id,
-          ...(formatTelegramDisplayName(user)
-            ? { passenger_name: formatTelegramDisplayName(user) }
-            : {}),
+          telegram_user_id: telegramUserId,
+          ...(passengerName ? { passenger_name: passengerName } : {}),
         }),
       })
 
