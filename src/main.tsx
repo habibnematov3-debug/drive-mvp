@@ -4,7 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { LanguageProvider } from './contexts/LanguageContext.tsx'
 
-creatRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LanguageProvider>
       <App />

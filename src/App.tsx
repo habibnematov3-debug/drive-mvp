@@ -30,16 +30,6 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
-  function formatAuthError(error: unknown) {
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      return t('auth.connectionError')
-    }
-    if (error instanceof Error) {
-      return error.message
-    }
-    return t('auth.failedToLoadProfile')
-  }
-
   useEffect(() => {
     const webApp = getTelegramWebApp()
     webApp?.ready?.()
@@ -139,10 +129,16 @@ export default function App() {
         }
       } catch (error) {
         if (controller.signal.aborted) return
+        const nextAuthError =
+          error instanceof TypeError && error.message === 'Failed to fetch'
+            ? t('auth.connectionError')
+            : error instanceof Error
+              ? error.message
+              : t('auth.failedToLoadProfile')
         setPassenger(null)
         setOrders([])
         setAuthState('error')
-        setAuthError(formatAuthError(error))
+        setAuthError(nextAuthError)
         return
       }
 
