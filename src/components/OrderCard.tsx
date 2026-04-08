@@ -2,16 +2,27 @@ import { useLanguage } from '../contexts/LanguageContext'
 import type { RequestStatus, RideRequest } from '../types/drivee'
 import {
   formatDateUz,
-  formatPassengerGender,
   formatPassengerCount,
+  formatPassengerGender,
 } from '../utils/format'
 
 type OrderCardProps = {
   order: RideRequest
 }
 
-function StatusBadge({ status, t }: { status: RequestStatus; t: (key: string) => string }) {
-  const statusText = status === 'submitted' ? t('status.submitted') : status === 'matched' ? t('status.matched') : t('status.cancelled')
+function StatusBadge({
+  status,
+  t,
+}: {
+  status: RequestStatus
+  t: (key: string) => string
+}) {
+  const statusText =
+    status === 'submitted'
+      ? t('status.submitted')
+      : status === 'matched'
+        ? t('status.matched')
+        : t('status.cancelled')
 
   if (status === 'submitted') {
     return (
@@ -37,7 +48,12 @@ function StatusBadge({ status, t }: { status: RequestStatus; t: (key: string) =>
 }
 
 export default function OrderCard({ order }: OrderCardProps) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
+  const routeTitle =
+    order.routeId === 'kokand-tashkent'
+      ? t('routes.kokandTashkent')
+      : t('routes.tashkentKokand')
+
   return (
     <article className="bg-transparent px-4 py-4">
       <div className="flex items-start justify-between gap-3">
@@ -45,12 +61,10 @@ export default function OrderCard({ order }: OrderCardProps) {
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
-        <div className="text-base font-extrabold text-brand-ink">
-          {order.routeLabel}
-        </div>
+        <div className="text-base font-extrabold text-brand-ink">{routeTitle}</div>
 
         <div className="text-sm text-brand-muted">
-          {formatDateUz(order.dateISO)} • {order.time}
+          {formatDateUz(order.dateISO, language)} | {order.time}
         </div>
 
         {order.passengerPhone ? (
@@ -88,7 +102,8 @@ export default function OrderCard({ order }: OrderCardProps) {
         ) : null}
 
         <div className="pt-1 text-xs text-brand-muted">
-          {t('orders.bookingId')}: <span className="font-semibold text-brand-ink">{order.id}</span>
+          {t('orders.bookingId')}:{' '}
+          <span className="font-semibold text-brand-ink">{order.id}</span>
         </div>
       </div>
     </article>

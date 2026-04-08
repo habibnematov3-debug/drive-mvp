@@ -19,7 +19,10 @@
     font-size: 15px;
     line-height: 1.4;
     color: #18263b;
-    background: #f6f7fa;
+    background:
+      radial-gradient(1200px 420px at 80% -20%, rgba(47, 151, 212, 0.14), transparent 60%),
+      radial-gradient(900px 360px at -10% 10%, rgba(56, 189, 248, 0.12), transparent 55%),
+      #f6f7fa;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -61,4 +64,20 @@ input[type='time'] {
 textarea::placeholder,
 input::placeholder {
   color: #9aa7b8;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.screen-enter {
+  animation: screen-in 220ms ease-out;
 }

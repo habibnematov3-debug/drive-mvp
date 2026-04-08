@@ -55,7 +55,7 @@ export default function HomeScreen({
   passengerName,
   telegramUserId,
 }: HomeScreenProps) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const [routeId, setRouteId] = useState<RouteId>('kokand-tashkent')
   const [dateISO, setDateISO] = useState(getTodayISO())
   const [time, setTime] = useState(getDefaultTimeValue())
@@ -69,6 +69,15 @@ export default function HomeScreen({
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const selectedRouteLabel =
+    routeId === 'kokand-tashkent'
+      ? t('routes.kokandTashkent')
+      : t('routes.tashkentKokand')
+  const summaryDate = new Intl.DateTimeFormat(
+    language === 'ru' ? 'ru-RU' : 'uz-UZ',
+    { day: '2-digit', month: 'short' },
+  ).format(new Date(`${dateISO}T00:00:00`))
 
   function resetFormState() {
     setRouteId('kokand-tashkent')
@@ -191,7 +200,7 @@ export default function HomeScreen({
 
   if (isSubmitted) {
     return (
-      <div className="pb-4 pt-1">
+      <div className="screen-enter pb-4 pt-1">
         <section className="rounded-[32px] border border-brand-line bg-white px-5 py-8 text-center shadow-soft">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-blue-soft">
             <SuccessIcon />
@@ -216,12 +225,24 @@ export default function HomeScreen({
   }
 
   return (
-    <div className="pb-4 pt-1">
+    <div className="screen-enter pb-4 pt-1">
       <div className="space-y-3">
         <RouteSelector value={routeId} onChange={setRouteId} />
         <DatePicker value={dateISO} onChange={setDateISO} />
         <TimePicker value={time} onChange={setTime} />
       </div>
+
+      <section className="mt-4 overflow-hidden rounded-[28px] border border-brand-blue/20 bg-gradient-to-br from-brand-blue to-sky-400 p-4 text-white shadow-soft">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/85">
+          {t('home.summaryTitle')}
+        </div>
+        <div className="mt-2 text-base font-bold">{selectedRouteLabel}</div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+          <span className="rounded-full bg-white/20 px-3 py-1">{summaryDate}</span>
+          <span className="rounded-full bg-white/20 px-3 py-1">{time}</span>
+        </div>
+        <p className="mt-3 text-xs text-white/90">{t('home.summaryHint')}</p>
+      </section>
 
       <section className="mt-4 rounded-[32px] border border-brand-line bg-white p-4 shadow-soft">
         <div>

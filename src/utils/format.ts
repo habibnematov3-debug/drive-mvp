@@ -1,26 +1,39 @@
 import type { PassengerGender, RequestStatus } from '../types/drivee'
 
-const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat('uz-UZ', {
-  day: 'numeric',
-  month: 'short',
-})
+const SHORT_DATE_FORMATTERS = {
+  uz: new Intl.DateTimeFormat('uz-UZ', {
+    day: 'numeric',
+    month: 'short',
+  }),
+  ru: new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  }),
+}
 
-const FULL_DATE_FORMATTER = new Intl.DateTimeFormat('uz-UZ', {
-  day: '2-digit',
-  month: 'long',
-  year: 'numeric',
-})
+const FULL_DATE_FORMATTERS = {
+  uz: new Intl.DateTimeFormat('uz-UZ', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }),
+  ru: new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }),
+}
 
 export function dateISOToDate(dateISO: string) {
   return new Date(`${dateISO}T00:00:00`)
 }
 
-export function formatDateUz(dateISO: string) {
-  return SHORT_DATE_FORMATTER.format(dateISOToDate(dateISO))
+export function formatDateUz(dateISO: string, language: 'uz' | 'ru' = 'uz') {
+  return SHORT_DATE_FORMATTERS[language].format(dateISOToDate(dateISO))
 }
 
-export function formatFullDateUz(dateISO: string) {
-  return FULL_DATE_FORMATTER.format(dateISOToDate(dateISO))
+export function formatFullDateUz(dateISO: string, language: 'uz' | 'ru' = 'uz') {
+  return FULL_DATE_FORMATTERS[language].format(dateISOToDate(dateISO))
 }
 
 export function formatPriceUzs(priceUzs: number) {
@@ -71,8 +84,17 @@ export function formatPassengerGender(gender: PassengerGender, t?: (key: string)
   return t('home.noPreference')
 }
 
-export function formatRequestStatus(status: RequestStatus) {
-  if (status === 'matched') return 'Haydovchi topildi'
-  if (status === 'cancelled') return 'Bekor qilingan'
-  return 'Qabul qilindi'
+export function formatRequestStatus(
+  status: RequestStatus,
+  t?: (key: string) => string,
+) {
+  if (!t) {
+    if (status === 'matched') return 'Haydovchi topildi'
+    if (status === 'cancelled') return 'Bekor qilingan'
+    return 'Qabul qilindi'
+  }
+
+  if (status === 'matched') return t('status.matched')
+  if (status === 'cancelled') return t('status.cancelled')
+  return t('status.submitted')
 }

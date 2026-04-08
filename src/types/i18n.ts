@@ -6,6 +6,16 @@ export interface LanguageLabel {
 }
 
 export interface Translations {
+  navigation: {
+    home: LanguageLabel
+    orders: LanguageLabel
+    profile: LanguageLabel
+  }
+  header: {
+    homeSubtitle: LanguageLabel
+    ordersSubtitle: LanguageLabel
+    profileSubtitle: LanguageLabel
+  }
   common: {
     loading: LanguageLabel
     error: LanguageLabel
@@ -52,6 +62,8 @@ export interface Translations {
     bookingSuccess: LanguageLabel
     bookingSuccessDesc: LanguageLabel
     newBooking: LanguageLabel
+    summaryTitle: LanguageLabel
+    summaryHint: LanguageLabel
   }
   orders: {
     title: LanguageLabel
@@ -63,6 +75,15 @@ export interface Translations {
     phone: LanguageLabel
     fullCar: LanguageLabel
     hasBag: LanguageLabel
+    filterAll: LanguageLabel
+    filterSubmitted: LanguageLabel
+    filterMatched: LanguageLabel
+    filterCancelled: LanguageLabel
+    statTotal: LanguageLabel
+    statOpen: LanguageLabel
+    statMatched: LanguageLabel
+    emptyTitle: LanguageLabel
+    emptyHint: LanguageLabel
   }
   profile: {
     language: LanguageLabel

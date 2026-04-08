@@ -1,3 +1,5 @@
+import { useLanguage } from '../contexts/LanguageContext'
+
 type TimePickerProps = {
   label?: string
   value: string
@@ -19,14 +21,17 @@ function ClockIcon() {
 }
 
 export default function TimePicker({
-  label = 'Vaqt',
+  label,
   value,
   onChange,
 }: TimePickerProps) {
+  const { t } = useLanguage()
+  const resolvedLabel = label ?? t('home.time')
+
   return (
     <section className="rounded-[28px] border border-brand-line bg-white p-4 shadow-soft">
       <label className="block text-sm font-semibold text-brand-ink">
-        {label}
+        {resolvedLabel}
       </label>
       <div className="relative mt-3">
         <input

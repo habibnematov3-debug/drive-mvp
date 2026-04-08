@@ -1,3 +1,4 @@
+import { useLanguage } from '../contexts/LanguageContext'
 import { navItems } from '../data/navigation'
 import type { TabKey } from '../types/drivee'
 
@@ -69,13 +70,15 @@ function ProfileIcon({ active }: { active: boolean }) {
 }
 
 export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+  const { t } = useLanguage()
+
   const tabButtonClass = (active: boolean) =>
     [
-      'flex flex-1 flex-col items-center justify-center gap-1 rounded-[18px] py-2 transition-all',
+      'relative flex flex-1 flex-col items-center justify-center gap-1 rounded-[18px] py-2 transition-all duration-200',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
       active
-        ? 'border border-brand-ink bg-white text-brand-blue shadow-[0_10px_24px_rgba(24,38,59,0.08)]'
-        : 'border border-transparent text-slate-400',
+        ? 'border border-brand-line bg-white text-brand-blue shadow-[0_10px_24px_rgba(24,38,59,0.08)]'
+        : 'border border-transparent text-slate-400 hover:bg-white/70',
     ].join(' ')
 
   return (
@@ -84,7 +87,7 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex gap-1">
-        {navItems.map(({ tab, label }) => {
+        {navItems.map(({ tab }) => {
           const active = activeTab === tab
           const Icon =
             tab === 'home' ? HomeIcon : tab === 'orders' ? OrdersIcon : ProfileIcon
@@ -101,12 +104,19 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               <span
                 className={
                   active
-                    ? 'text-brand-blue text-xs font-medium'
+                    ? 'text-brand-blue text-xs font-semibold'
                     : 'text-slate-400 text-xs font-medium'
                 }
               >
-                {label}
+                {tab === 'home'
+                  ? t('navigation.home')
+                  : tab === 'orders'
+                    ? t('navigation.orders')
+                    : t('navigation.profile')}
               </span>
+              {active ? (
+                <span className="absolute -bottom-[2px] h-1.5 w-8 rounded-full bg-brand-blue/20" />
+              ) : null}
             </button>
           )
         })}

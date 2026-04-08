@@ -1,3 +1,5 @@
+import { useLanguage } from '../contexts/LanguageContext'
+
 type PassengerCountSelectorProps = {
   value: number
   onChange: (next: number) => void
@@ -21,11 +23,13 @@ export default function PassengerCountSelector({
   value,
   onChange,
 }: PassengerCountSelectorProps) {
+  const { t } = useLanguage()
+
   return (
     <div>
       <div className="flex items-center gap-3 text-brand-ink">
         <PeopleIcon />
-        <div className="text-[1.05rem] font-semibold">Yo'lovchilar soni</div>
+        <div className="text-[1.05rem] font-semibold">{t('home.passengerCount')}</div>
       </div>
 
       <div className="mt-4 grid grid-cols-4 gap-2">

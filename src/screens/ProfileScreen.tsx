@@ -13,7 +13,7 @@ export default function ProfileScreen({
   onSupport,
 }: ProfileScreenProps) {
   return (
-    <div className="pb-2 pt-0">
+    <div className="screen-enter pb-2 pt-0">
       <ProfileCard
         passenger={passenger}
         onLogout={onLogout}

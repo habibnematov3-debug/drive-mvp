@@ -40,6 +40,13 @@ export default function ProfileCard({
         </div>
       </div>
 
+      <div className="rounded-[24px] border border-brand-line bg-brand-soft/50 px-4 py-3">
+        <div className="text-xs text-brand-muted">Telegram</div>
+        <div className="mt-1 text-sm font-semibold text-brand-ink">
+          {passenger.languageLabel || "O'zbekcha"}
+        </div>
+      </div>
+
       <LanguageSelector />
 
       <button

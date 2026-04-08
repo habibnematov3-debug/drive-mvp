@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { mockUser, routeLabels } from './data/mock'
+import { mockUser } from './data/mock'
 import AppLayout from './layout/AppLayout'
 import AuthScreen from './screens/AuthScreen'
 import HomeScreen from './screens/HomeScreen'
@@ -29,6 +29,17 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [authError, setAuthError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const headerSubtitle =
+    tab === 'home'
+      ? t('header.homeSubtitle')
+      : tab === 'orders'
+        ? t('header.ordersSubtitle')
+        : t('header.profileSubtitle')
+
+  const getRouteLabel = (routeId: RequestFormData['routeId']) =>
+    routeId === 'kokand-tashkent'
+      ? t('routes.kokandTashkent')
+      : t('routes.tashkentKokand')
 
   useEffect(() => {
     const webApp = getTelegramWebApp()
@@ -177,7 +188,7 @@ export default function App() {
     const nextOrder: RideRequest = {
       id: bookingId,
       routeId: request.routeId,
-      routeLabel: routeLabels[request.routeId],
+      routeLabel: getRouteLabel(request.routeId),
       dateISO: request.dateISO,
       time: request.time,
       passengerPhone: request.passengerPhone,
@@ -205,7 +216,7 @@ export default function App() {
       return
     }
 
-    showToast('VITE_TELEGRAM_BOT_URL sozlanmagan')
+    showToast('VITE_TELEGRAM_BOT_URL is not configured')
   }
 
   function handleLogout() {
@@ -218,7 +229,7 @@ export default function App() {
         activeTab={tab}
         onTabChange={setTab}
         headerTitle="Drivee"
-        headerSubtitle="Shaharlararo safar arizalari"
+        headerSubtitle={headerSubtitle}
       >
         {authState !== 'ready' || !passenger ? (
           <AuthScreen

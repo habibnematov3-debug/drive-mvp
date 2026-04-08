@@ -1,4 +1,5 @@
 import { getTodayISO } from '../utils/format'
+import { useLanguage } from '../contexts/LanguageContext'
 
 type DatePickerProps = {
   label?: string
@@ -21,16 +22,18 @@ function CalendarIcon() {
 }
 
 export default function DatePicker({
-  label = 'Sana',
+  label,
   value,
   onChange,
 }: DatePickerProps) {
+  const { t } = useLanguage()
   const todayISO = getTodayISO()
+  const resolvedLabel = label ?? t('home.date')
 
   return (
     <section className="rounded-[28px] border border-brand-line bg-white p-4 shadow-soft">
       <label className="block text-sm font-semibold text-brand-ink">
-        {label}
+        {resolvedLabel}
       </label>
       <div className="relative mt-3">
         <input
