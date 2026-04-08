@@ -20,6 +20,19 @@ import {
 
 type AuthState = 'loading' | 'ready' | 'telegram_required' | 'error'
 
+function isNetworkFetchError(error: unknown) {
+  if (!(error instanceof Error)) return false
+
+  const normalized = error.message.toLowerCase()
+  return (
+    error instanceof TypeError ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('networkerror') ||
+    normalized.includes('network request failed') ||
+    normalized.includes('load failed')
+  )
+}
+
 export default function App() {
   const { t } = useLanguage()
   const [tab, setTab] = useState<TabKey>('home')
@@ -63,6 +76,7 @@ export default function App() {
         setPassenger(null)
         setOrders([])
         setAuthState('telegram_required')
+        setAuthError(null)
         setIsOrdersLoading(false)
         return
       }
@@ -141,7 +155,7 @@ export default function App() {
       } catch (error) {
         if (controller.signal.aborted) return
         const nextAuthError =
-          error instanceof TypeError && error.message === 'Failed to fetch'
+          isNetworkFetchError(error)
             ? t('auth.connectionError')
             : error instanceof Error
               ? error.message
