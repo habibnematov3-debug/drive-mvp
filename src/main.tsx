@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { LanguageProvider } from './contexts/LanguageContext.tsx'
 
+// Fixed typo: creatRoot -> createRoot
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LanguageProvider>
