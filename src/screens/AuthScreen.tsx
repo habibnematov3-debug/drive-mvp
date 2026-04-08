@@ -40,6 +40,11 @@ export default function AuthScreen({
   const isLoading = authState === 'loading'
   const shouldShowTelegramButton = authState === 'telegram_required' && canOpenTelegram
   const shouldShowRetryButton = authState === 'error' && Boolean(onRetry)
+  const messageText = isLoading
+    ? t('auth.checkingProfile')
+    : authState === 'telegram_required'
+      ? t('auth.needTelegramApp')
+      : errorMessage || t('auth.needTelegramApp')
 
   return (
     <div className="screen-enter pb-4 pt-1">
@@ -53,9 +58,7 @@ export default function AuthScreen({
           {t('auth.telegramLogin')}
         </h2>
         <p className="mt-3 text-sm leading-6 text-brand-muted">
-          {isLoading
-            ? t('auth.checkingProfile')
-            : errorMessage || t('auth.needTelegramApp')}
+          {messageText}
         </p>
 
         {shouldShowTelegramButton ? (
