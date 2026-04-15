@@ -43,23 +43,6 @@ export default defineConfig([
 ])
 ```
 
-## Netlify Deployment
-
-- Build command: `npm run build`
-- Publish directory: `dist`
-- Set `VITE_API_BASE_URL` in Netlify to the deployed backend URL, for example `https://your-backend.example.com`
-- Optional: set `VITE_TELEGRAM_BOT_URL` to your bot link, for example `https://t.me/your_bot_username`
-- The app falls back to `http://localhost:3000` in local development
-
-## Render Backend Deployment
-
-- Render service type: `Web Service`
-- Root directory: `backend`
-- Build command: `npm install`
-- Start command: `npm start`
-- Health check path: `/health`
-- Required environment variables: `BOT_TOKEN`, `BOOKING_GROUP_ID`, `GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`
-- The repo includes [`render.yaml`](/D:/Drive/drivee-mvp/render.yaml) if you want to deploy with a Blueprint instead of filling the dashboard manually
 
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
