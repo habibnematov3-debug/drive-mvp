@@ -14,17 +14,18 @@
 
   body {
     margin: 0;
-    font-family:
-      system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 15px;
-    line-height: 1.4;
-    color: #18263b;
-    background:
-      radial-gradient(1200px 420px at 80% -20%, rgba(47, 151, 212, 0.14), transparent 60%),
-      radial-gradient(900px 360px at -10% 10%, rgba(56, 189, 248, 0.12), transparent 55%),
-      #f6f7fa;
+    font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #1a1c1e;
+    background: 
+      radial-gradient(circle at top left, rgba(47, 151, 212, 0.08), transparent 40%),
+      radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.05), transparent 40%),
+      #f8fafd;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow: hidden; /* Prevents bounce on iOS */
+    user-select: none;
   }
 
   #root {
@@ -80,4 +81,13 @@ input::placeholder {
 
 .screen-enter {
   animation: screen-in 220ms ease-out;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
