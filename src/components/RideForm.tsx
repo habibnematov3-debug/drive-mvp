@@ -121,7 +121,7 @@ export default function RideForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-3">
       {/* Route Selector */}
       <div>
         <RouteSelector
@@ -129,7 +129,7 @@ export default function RideForm({
           onChange={(value) => setValue('routeId', value)}
         />
         {errors.routeId && (
-          <p className="text-red-500 text-sm mt-1">{errors.routeId.message}</p>
+          <p className="text-red-500 text-xs mt-1">{errors.routeId.message}</p>
         )}
       </div>
 
@@ -137,10 +137,10 @@ export default function RideForm({
       <div>
         <DatePicker
           value={watchedValues.dateISO}
-          onChange={(value) => setValue('dateISO', value)}
+          onChange={(date) => setValue('dateISO', date)}
         />
         {errors.dateISO && (
-          <p className="text-red-500 text-sm mt-1">{errors.dateISO.message}</p>
+          <p className="text-red-500 text-xs mt-1">{errors.dateISO.message}</p>
         )}
       </div>
 
@@ -148,10 +148,10 @@ export default function RideForm({
       <div>
         <TimePicker
           value={watchedValues.time}
-          onChange={(value) => setValue('time', value)}
+          onChange={(time) => setValue('time', time)}
         />
         {errors.time && (
-          <p className="text-red-500 text-sm mt-1">{errors.time.message}</p>
+          <p className="text-red-500 text-xs mt-1">{errors.time.message}</p>
         )}
       </div>
 

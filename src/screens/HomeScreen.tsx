@@ -95,12 +95,8 @@ export default function HomeScreen({
   }
 
   return (
-    <div className="px-1 py-4 space-y-6 screen-enter">
-      <div className="text-center px-4">
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-brand-blue/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-brand-blue mb-3">
-          <div className="h-1.5 w-1.5 rounded-full bg-brand-blue animate-pulse" />
-          {t('appName') || 'Drivee Premium'}
-        </div>
+    <div className="form-container px-4 py-6 space-y-6">
+      <div className="text-center">
         <h1 className="text-3xl font-black text-brand-ink mb-2 tracking-tight">
           {t('home.title') || 'Book Your Trip'}
         </h1>

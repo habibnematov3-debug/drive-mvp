@@ -1,0 +1,38 @@
+/* Telegram Mini App specific styles */
+.telegram-web-app {
+  height: 100vh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+body {
+  overflow-y: auto !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+#root {
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow-y: auto !important;
+}
+
+/* Ensure form container can scroll */
+.form-container {
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+
+/* Remove any fixed heights that might prevent scrolling */
+.screen-enter {
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow-y: auto !important;
+}
+
+/* Make sure the app layout can scroll */
+.app-layout {
+  height: auto !important;
+  overflow-y: auto !important;
+}
