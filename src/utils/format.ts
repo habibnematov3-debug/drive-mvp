@@ -91,10 +91,21 @@ export function formatRequestStatus(
   if (!t) {
     if (status === 'matched') return 'Haydovchi topildi'
     if (status === 'cancelled') return 'Bekor qilingan'
-    return 'Qabul qilindi'
+    return 'Qabul qilingan'
   }
 
   if (status === 'matched') return t('status.matched')
   if (status === 'cancelled') return t('status.cancelled')
   return t('status.submitted')
+}
+
+export const PHONE_REGEX = /^\+998\d{9}$/
+
+export function normalizePhoneNumber(value: string) {
+  const digits = value.replace(/\D/g, '')
+
+  if (!digits) return ''
+  if (digits.startsWith('998')) return `+${digits.slice(0, 12)}`
+  if (digits.length <= 9) return `+998${digits}`
+  return `+${digits}`
 }

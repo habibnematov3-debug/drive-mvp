@@ -1,4 +1,12 @@
+import { Clock } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
 
 type TimePickerProps = {
   label?: string
@@ -6,18 +14,21 @@ type TimePickerProps = {
   onChange: (next: string) => void
 }
 
-function ClockIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 7.5V12l3 2M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
+// Generate time options in 15-minute intervals
+const generateTimeOptions = () => {
+  const options = []
+  for (let hour = 0; hour < 24; hour++) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+      const displayTime = new Date(`2000-01-01T${timeString}`).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+      options.push({ value: timeString, label: displayTime })
+    }
+  }
+  return options
 }
 
 export default function TimePicker({
@@ -27,23 +38,30 @@ export default function TimePicker({
 }: TimePickerProps) {
   const { t } = useLanguage()
   const resolvedLabel = label ?? t('home.time')
+  const timeOptions = generateTimeOptions()
 
   return (
     <section className="rounded-[28px] border border-brand-line bg-white p-4 shadow-soft">
-      <label className="block text-sm font-semibold text-brand-ink">
-        {resolvedLabel}
-      </label>
-      <div className="relative mt-3">
-        <input
-          type="time"
-          value={value}
-          step={900}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-[20px] border border-brand-line bg-white px-4 py-3 text-base text-brand-ink outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-        />
-        <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-brand-muted">
-          <ClockIcon />
-        </div>
+      <div className="space-y-2">
+        <label className="text-sm font-semibold text-brand-ink">
+          {resolvedLabel}
+        </label>
+        
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger className="h-12 px-4">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-brand-muted" />
+              <SelectValue placeholder={t('home.selectTime') || 'Select time'} />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            {timeOptions.map((time) => (
+              <SelectItem key={time.value} value={time.value}>
+                {time.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </section>
   )

@@ -37,6 +37,7 @@ export interface Translations {
   home: {
     route: LanguageLabel
     date: LanguageLabel
+    otherDate: LanguageLabel
     time: LanguageLabel
     phone: LanguageLabel
     phoneRequired: LanguageLabel
@@ -100,5 +101,9 @@ export interface Translations {
   routes: {
     kokandTashkent: LanguageLabel
     tashkentKokand: LanguageLabel
+    tashkentSamarkand: LanguageLabel
+    samarkandTashkent: LanguageLabel
+    tashkentNamangan: LanguageLabel
+    namanganTashkent: LanguageLabel
   }
 }

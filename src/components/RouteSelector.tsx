@@ -7,6 +7,20 @@ type RouteSelectorProps = {
   onChange: (next: RouteId) => void
 }
 
+type RouteOption = {
+  id: RouteId
+  label: string
+}
+
+const ROUTE_OPTIONS: RouteOption[] = [
+  { id: 'kokand-tashkent', label: 'Kokand → Tashkent' },
+  { id: 'tashkent-kokand', label: 'Tashkent → Kokand' },
+  { id: 'tashkent-samarkand', label: 'Tashkent → Samarkand' },
+  { id: 'samarkand-tashkent', label: 'Samarkand → Tashkent' },
+  { id: 'tashkent-namangan', label: 'Tashkent → Namangan' },
+  { id: 'namangan-tashkent', label: 'Namangan → Tashkent' },
+]
+
 export default function RouteSelector({
   label,
   value,
@@ -16,33 +30,36 @@ export default function RouteSelector({
   const resolvedLabel = label ?? t('home.route')
 
   return (
-    <section className="rounded-[28px] border border-brand-line bg-white p-4 shadow-soft">
-      <div className="text-sm font-semibold text-brand-ink">{resolvedLabel}</div>
-      <div className="mt-3 grid grid-cols-2 gap-2 rounded-[24px] bg-brand-soft p-1.5">
-        <button
-          type="button"
-          onClick={() => onChange('kokand-tashkent')}
-          className={
-            value === 'kokand-tashkent'
-              ? 'rounded-[20px] bg-brand-blue px-3 py-3 text-center text-sm font-semibold text-white shadow-soft transition'
-              : 'rounded-[20px] px-3 py-3 text-center text-sm font-semibold text-brand-ink transition hover:bg-white/70'
-          }
-          aria-pressed={value === 'kokand-tashkent'}
+    <section className="rounded-[32px] border border-brand-line bg-white p-4 shadow-soft">
+      <label className="block text-[1.05rem] font-semibold text-brand-ink">
+        {resolvedLabel}
+      </label>
+      <div className="relative mt-3">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value as RouteId)}
+          className="w-full appearance-none rounded-[22px] border border-brand-line bg-white py-3 pl-4 pr-10 text-sm font-semibold text-brand-ink outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
         >
-          {t('routes.kokandTashkent')}
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange('tashkent-kokand')}
-          className={
-            value === 'tashkent-kokand'
-              ? 'rounded-[20px] bg-brand-blue px-3 py-3 text-center text-sm font-semibold text-white shadow-soft transition'
-              : 'rounded-[20px] px-3 py-3 text-center text-sm font-semibold text-brand-ink transition hover:bg-white/70'
-          }
-          aria-pressed={value === 'tashkent-kokand'}
-        >
-          {t('routes.tashkentKokand')}
-        </button>
+          {ROUTE_OPTIONS.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-brand-muted">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
       </div>
     </section>
   )

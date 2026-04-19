@@ -1,11 +1,26 @@
-import { useMemo, useRef, useEffect } from 'react'
-import { getTodayISO, getDateISOFromNow, dateISOToDate } from '../utils/format'
+import { useRef, useEffect, useState } from 'react'
+import { format, addDays, isSameDay, startOfToday } from 'date-fns'
+import { uz, ru, enUS } from 'date-fns/locale'
+import { CalendarIcon } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
+import { Calendar } from './ui/calendar'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from './ui/popover'
+import { cn } from '../lib/utils'
 
 type DatePickerProps = {
   label?: string
   value: string
   onChange: (next: string) => void
+}
+
+const getLocale = (lang: string) => {
+  if (lang === 'ru') return ru
+  if (lang === 'uz') return uz
+  return enUS
 }
 
 export default function DatePicker({
@@ -15,88 +30,100 @@ export default function DatePicker({
 }: DatePickerProps) {
   const { t, language } = useLanguage()
   const scrollRef = useRef<HTMLDivElement>(null)
-
-  const items = useMemo(() => {
-    const dates = []
-    for (let i = 0; i < 14; i++) {
-      const iso = getDateISOFromNow(i)
-      const date = dateISOToDate(iso)
-      dates.push({
-        iso,
-        day: date.getDate(),
-        weekday: new Intl.DateTimeFormat(language === 'ru' ? 'ru-RU' : 'uz-UZ', {
-          weekday: 'short',
-        }).format(date),
-        month: new Intl.DateTimeFormat(language === 'ru' ? 'ru-RU' : 'uz-UZ', {
-          month: 'short',
-        }).format(date),
-      })
-    }
-    return dates
-  }, [language])
-
+  const [showCalendar, setShowCalendar] = useState(false)
+  
   const resolvedLabel = label ?? t('home.date')
+  const locale = getLocale(language)
+  const today = startOfToday()
 
+  // Generate next 14 days
+  const dates = Array.from({ length: 14 }, (_, i) => addDays(today, i))
+
+  const selectedDate = value ? new Date(value) : null
+  const isCustomDate = selectedDate && !dates.some(d => isSameDay(d, selectedDate))
+
+  const handleSelect = (date: Date) => {
+    const isoString = format(date, 'yyyy-MM-dd')
+    onChange(isoString)
+    setShowCalendar(false)
+  }
+
+  // Scroll to selected date on mount
   useEffect(() => {
-    if (scrollRef.current) {
-      const activeItem = scrollRef.current.querySelector('[data-active="true"]')
-      if (activeItem) {
-        activeItem.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-          inline: 'center',
-        })
+    if (selectedDate && scrollRef.current) {
+      const selectedEl = scrollRef.current.querySelector('[data-selected="true"]')
+      if (selectedEl) {
+        selectedEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
       }
     }
   }, [value])
 
   return (
     <section className="rounded-[32px] border border-brand-line bg-white p-4 shadow-soft">
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center justify-between mb-3 px-1">
         <label className="text-[1.05rem] font-semibold text-brand-ink">
           {resolvedLabel}
         </label>
-        <div className="relative overflow-hidden">
-          <input
-            type="date"
-            value={value}
-            min={getTodayISO()}
-            onChange={(e) => onChange(e.target.value)}
-            className="absolute inset-0 z-10 cursor-pointer opacity-0"
-          />
-          <span className="text-sm font-medium text-brand-blue flex items-center gap-1">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            {t('home.otherDate') || 'Choose'}
-          </span>
-        </div>
+        
+        <Popover open={showCalendar} onOpenChange={setShowCalendar}>
+          <PopoverTrigger asChild>
+            <button className={cn(
+              "flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider transition",
+              isCustomDate ? "text-brand-blue" : "text-brand-muted hover:text-brand-blue"
+            )}>
+              <CalendarIcon className="h-3.5 w-3.5" />
+              {t('home.otherDate') || 'Other'}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="single"
+              selected={selectedDate || undefined}
+              onSelect={(date) => date && handleSelect(date)}
+              initialFocus
+              disabled={(date) => date < today}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
 
-      <div
+      <div 
         ref={scrollRef}
-        className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1"
+        className="no-scrollbar flex gap-2 overflow-x-auto pb-1"
       >
-        {items.map((item) => {
-          const active = value === item.iso
+        {dates.map((date) => {
+          const isSelected = selectedDate && isSameDay(date, selectedDate)
+          const dayName = format(date, 'EEE', { locale })
+          const dayNum = format(date, 'd')
+          const monthName = format(date, 'MMM', { locale })
+
           return (
             <button
-              key={item.iso}
+              key={date.toISOString()}
               type="button"
-              data-active={active}
-              onClick={() => onChange(item.iso)}
-              className={`flex min-w-[62px] flex-col items-center rounded-[22px] py-3 transition-all duration-200 ${
-                active
-                  ? 'bg-brand-blue text-white shadow-md ring-4 ring-brand-blue/10 scale-105'
-                  : 'bg-brand-soft/40 text-brand-ink hover:bg-brand-soft/60'
-              }`}
+              data-selected={isSelected}
+              onClick={() => handleSelect(date)}
+              className={cn(
+                "flex min-w-[64px] flex-col items-center justify-center rounded-[22px] py-3 transition-all active:scale-95",
+                isSelected
+                  ? "bg-brand-blue text-white shadow-soft shadow-brand-blue/30"
+                  : "bg-brand-soft hover:bg-brand-soft/80 text-brand-ink"
+              )}
             >
-              <span className={`text-[10px] uppercase tracking-wider font-bold ${active ? 'text-white/80' : 'text-brand-muted'}`}>
-                {item.weekday}
+              <span className={cn(
+                "text-[10px] font-bold uppercase tracking-tight mb-0.5",
+                isSelected ? "text-white/80" : "text-brand-muted"
+              )}>
+                {dayName}
               </span>
-              <span className="mt-1 text-lg font-bold">{item.day}</span>
-              <span className={`text-[10px] font-medium ${active ? 'text-white/80' : 'text-brand-muted'}`}>
-                {item.month}
+              <span className="text-base font-black leading-none">
+                {dayNum}
+              </span>
+              <span className={cn(
+                "text-[10px] font-bold mt-0.5",
+                isSelected ? "text-white/80" : "text-brand-muted"
+              )}>
+                {monthName}
               </span>
             </button>
           )

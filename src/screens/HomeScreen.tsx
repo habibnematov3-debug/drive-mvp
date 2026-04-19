@@ -1,23 +1,10 @@
 import { useState } from 'react'
-import DatePicker from '../components/DatePicker'
-import GenderPreferenceSelector from '../components/GenderPreferenceSelector'
-import PassengerCountSelector from '../components/PassengerCountSelector'
-import RouteSelector from '../components/RouteSelector'
-import TimePicker from '../components/TimePicker'
-import ToggleSwitch from '../components/ToggleSwitch'
+import RideForm from '../components/RideForm'
 import { useLanguage } from '../contexts/LanguageContext'
 import { routeLabels } from '../data/mock'
-import type {
-  PassengerGender,
-  RequestFormData,
-  RouteId,
-} from '../types/drivee'
+import type { RequestFormData } from '../types/drivee'
 import { getApiBaseUrl } from '../utils/api'
 import { buildTelegramAuthHeaders } from '../utils/telegram'
-import {
-  getDefaultTimeValue,
-  getTodayISO,
-} from '../utils/format'
 
 type HomeScreenProps = {
   onSubmitRequest: (payload: RequestFormData, bookingId: string) => void
@@ -25,100 +12,16 @@ type HomeScreenProps = {
   telegramUserId?: string
 }
 
-const PHONE_REGEX = /^\+998\d{9}$/
-
-function normalizePhoneNumber(value: string) {
-  const digits = value.replace(/\D/g, '')
-
-  if (!digits) return ''
-  if (digits.startsWith('998')) return `+${digits.slice(0, 12)}`
-  if (digits.length <= 9) return `+998${digits}`
-  return `+${digits}`
-}
-
-function SuccessIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M20 6 9 17l-5-5"
-        stroke="#2F97D4"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 export default function HomeScreen({
   onSubmitRequest,
   passengerName,
   telegramUserId,
 }: HomeScreenProps) {
-  const { language, t } = useLanguage()
-  const [routeId, setRouteId] = useState<RouteId>('kokand-tashkent')
-  const [dateISO, setDateISO] = useState(getTodayISO())
-  const [time, setTime] = useState(getDefaultTimeValue())
-  const [passengerPhone, setPassengerPhone] = useState('')
-  const [passengerCount, setPassengerCount] = useState(1)
-  const [fullCar, setFullCar] = useState(false)
-  const [passengerGender, setPassengerGender] =
-    useState<PassengerGender>('any')
-  const [hasBag, setHasBag] = useState(false)
-  const [comment, setComment] = useState('')
-  const [isSubmitted, setIsSubmitted] = useState(false)
+  const { t } = useLanguage()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const selectedRouteLabel =
-    routeId === 'kokand-tashkent'
-      ? t('routes.kokandTashkent')
-      : t('routes.tashkentKokand')
-  const summaryDate = new Intl.DateTimeFormat(
-    language === 'ru' ? 'ru-RU' : 'uz-UZ',
-    { day: '2-digit', month: 'short' },
-  ).format(new Date(`${dateISO}T00:00:00`))
-
-  function resetFormState() {
-    setRouteId('kokand-tashkent')
-    setDateISO(getTodayISO())
-    setTime(getDefaultTimeValue())
-    setPassengerPhone('')
-    setPassengerCount(1)
-    setFullCar(false)
-    setPassengerGender('any')
-    setHasBag(false)
-    setComment('')
-    setSubmitError(null)
-  }
-
-  async function handleSubmit() {
-    if (isSubmitting) return
-
-    const normalizedPhone = normalizePhoneNumber(passengerPhone)
-
-    if (!normalizedPhone) {
-      setSubmitError(t('home.phoneRequired'))
-      return
-    }
-
-    if (!PHONE_REGEX.test(normalizedPhone)) {
-      setSubmitError(t('home.phoneFormat'))
-      return
-    }
-
-    const requestPayload: RequestFormData = {
-      routeId,
-      dateISO,
-      time,
-      passengerPhone: normalizedPhone,
-      passengerCount,
-      fullCar,
-      passengerGender,
-      hasBag,
-      comment: comment.trim() ? comment.trim() : undefined,
-    }
-
+  const handleFormSubmit = async (payload: RequestFormData, _bookingId: string) => {
     try {
       setIsSubmitting(true)
       setSubmitError(null)
@@ -127,7 +30,7 @@ export default function HomeScreen({
 
       if (!apiBaseUrl) {
         throw new Error(
-          'VITE_API_BASE_URL is not configured. Set it and redeploy the frontend.',
+          'VITE_API_BASE_URL is not configured. Set it and redeploy frontend.',
         )
       }
 
@@ -138,16 +41,16 @@ export default function HomeScreen({
           ...buildTelegramAuthHeaders(telegramUserId),
         },
         body: JSON.stringify({
-          route_id: routeId,
-          route: routeLabels[routeId],
-          date: dateISO,
-          time,
-          passenger_phone: normalizedPhone,
-          seats: passengerCount,
-          full_car: fullCar,
-          has_bag: hasBag,
-          passenger_gender: passengerGender,
-          comment: requestPayload.comment ?? '',
+          route_id: payload.routeId,
+          route: routeLabels[payload.routeId as keyof typeof routeLabels],
+          date: payload.dateISO,
+          time: payload.time,
+          passenger_phone: payload.passengerPhone,
+          seats: payload.passengerCount,
+          full_car: payload.fullCar,
+          has_bag: payload.hasBag,
+          passenger_gender: payload.passengerGender,
+          comment: payload.comment ?? '',
           ...(passengerName ? { passenger_name: passengerName } : {}),
         }),
       })
@@ -178,150 +81,39 @@ export default function HomeScreen({
       }
 
       if (!result.booking_id) {
-        throw new Error('booking_id was not returned by the API')
+        throw new Error('booking_id was not returned by API')
       }
 
-      onSubmitRequest(requestPayload, result.booking_id)
-      resetFormState()
-      setIsSubmitted(true)
+      // Call the original onSubmitRequest with the payload and booking ID
+      onSubmitRequest(payload, result.booking_id)
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : t('home.submit'),
-      )
+      const errorMessage = error instanceof Error ? error.message : t('home.submitError')
+      setSubmitError(errorMessage)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  function handleReset() {
-    resetFormState()
-    setIsSubmitted(false)
-  }
-
-  if (isSubmitted) {
-    return (
-      <div className="screen-enter pb-4 pt-1">
-        <section className="rounded-[32px] border border-brand-line bg-white px-5 py-8 text-center shadow-soft">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-blue-soft">
-            <SuccessIcon />
-          </div>
-          <h2 className="mt-5 text-[1.75rem] font-bold leading-tight text-brand-ink">
-            {t('home.bookingSuccess')}
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-brand-muted">
-            {t('home.bookingSuccessDesc')}
-          </p>
-
-          <button
-            type="button"
-            onClick={handleReset}
-            className="mt-6 w-full rounded-[24px] bg-brand-blue py-4 text-base font-semibold text-white transition hover:brightness-[1.02] focus:outline-none focus:ring-4 focus:ring-brand-blue/10"
-          >
-            {t('home.newBooking')}
-          </button>
-        </section>
-      </div>
-    )
-  }
-
   return (
-    <div className="screen-enter pb-4 pt-1">
-      <div className="space-y-3">
-        <RouteSelector value={routeId} onChange={setRouteId} />
-        <DatePicker value={dateISO} onChange={setDateISO} />
-        <TimePicker value={time} onChange={setTime} />
+    <div className="px-1 py-4 space-y-6 screen-enter">
+      <div className="text-center px-4">
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-brand-blue/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-brand-blue mb-3">
+          <div className="h-1.5 w-1.5 rounded-full bg-brand-blue animate-pulse" />
+          {t('appName') || 'Drivee Premium'}
+        </div>
+        <h1 className="text-3xl font-black text-brand-ink mb-2 tracking-tight">
+          {t('home.title') || 'Book Your Trip'}
+        </h1>
+        <p className="text-sm font-medium text-brand-muted leading-relaxed max-w-[240px] mx-auto">
+          {t('home.subtitle') || 'Quick and comfortable intercity travels'}
+        </p>
       </div>
 
-      <section className="mt-4 overflow-hidden rounded-[28px] border border-brand-blue/20 bg-gradient-to-br from-brand-blue to-sky-400 p-4 text-white shadow-soft">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/85">
-          {t('home.summaryTitle')}
-        </div>
-        <div className="mt-2 text-base font-bold">{selectedRouteLabel}</div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-          <span className="rounded-full bg-white/20 px-3 py-1">{summaryDate}</span>
-          <span className="rounded-full bg-white/20 px-3 py-1">{time}</span>
-        </div>
-        <p className="mt-3 text-xs text-white/90">{t('home.summaryHint')}</p>
-      </section>
-
-      <section className="mt-4 rounded-[32px] border border-brand-line bg-white p-4 shadow-soft">
-        <div>
-          <label className="block text-[1.05rem] font-semibold text-brand-ink">
-            {t('home.phone')}
-          </label>
-          <input
-            value={passengerPhone}
-            onChange={(e) => setPassengerPhone(e.target.value)}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            className="mt-3 w-full rounded-[22px] border border-brand-line bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-            placeholder="+998901234567"
-          />
-          <p className="mt-2 text-xs text-brand-muted">
-            {t('home.phoneHelper')}
-          </p>
-        </div>
-
-        <PassengerCountSelector
-          value={passengerCount}
-          onChange={setPassengerCount}
-        />
-
-        <div className="mt-5 border-t border-brand-line pt-5">
-          <ToggleSwitch
-            checked={hasBag}
-            onChange={setHasBag}
-            label={t('home.hasBagLabel')}
-          />
-          <p className="mt-2 text-xs text-brand-muted">
-            {t('home.bagHelper')}
-          </p>
-        </div>
-
-        <div className="mt-5 border-t border-brand-line pt-5">
-          <ToggleSwitch
-            checked={fullCar}
-            onChange={setFullCar}
-            label={t('home.fullCarLabel')}
-          />
-        </div>
-
-        <div className="mt-5 border-t border-brand-line pt-5">
-          <GenderPreferenceSelector
-            value={passengerGender}
-            onChange={setPassengerGender}
-          />
-        </div>
-
-        <div className="mt-5 border-t border-brand-line pt-5">
-          <label className="block text-[1.05rem] font-semibold text-brand-ink">
-            {t('home.comment')}
-          </label>
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={4}
-            className="mt-3 w-full resize-none rounded-[22px] border border-brand-line bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-            placeholder={t('home.commentPlaceholder')}
-          />
-        </div>
-
-        {submitError ? (
-          <div className="mt-5 rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {submitError}
-          </div>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="mt-6 w-full rounded-[24px] bg-brand-blue py-4 text-base font-semibold text-white transition hover:brightness-[1.02] disabled:cursor-not-allowed disabled:opacity-70 focus:outline-none focus:ring-4 focus:ring-brand-blue/10"
-        >
-          {isSubmitting ? t('home.submitting') : t('home.submit')}
-        </button>
-      </section>
+      <RideForm
+        onSubmitRequest={handleFormSubmit}
+        isSubmitting={isSubmitting}
+        submitError={submitError}
+      />
     </div>
   )
 }

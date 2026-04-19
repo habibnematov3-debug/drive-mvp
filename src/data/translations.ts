@@ -50,6 +50,7 @@ export const translations: Translations = {
   home: {
     route: { uz: "Yo'nalish", ru: 'Marshrut' },
     date: { uz: 'Sana', ru: 'Data' },
+    otherDate: { uz: 'Boshqa', ru: 'Drugaya' },
     time: { uz: 'Vaqt', ru: 'Vremya' },
     phone: { uz: 'Telefon raqami', ru: 'Nomer telefona' },
     phoneRequired: { uz: 'Telefon raqamini kiriting', ru: 'Vvedite nomer telefona' },
@@ -132,7 +133,11 @@ export const translations: Translations = {
     cancelled: { uz: 'Bekor qilingan', ru: 'Otmenena' },
   },
   routes: {
-    kokandTashkent: { uz: 'Kokand -> Tashkent', ru: 'Kokand -> Tashkent' },
-    tashkentKokand: { uz: 'Tashkent -> Kokand', ru: 'Tashkent -> Kokand' },
+    kokandTashkent: { uz: 'Kokand → Tashkent', ru: 'Kokand → Tashkent' },
+    tashkentKokand: { uz: 'Tashkent → Kokand', ru: 'Tashkent → Kokand' },
+    tashkentSamarkand: { uz: 'Tashkent → Samarqand', ru: 'Tashkent → Samarkand' },
+    samarkandTashkent: { uz: 'Samarqand → Tashkent', ru: 'Samarkand → Tashkent' },
+    tashkentNamangan: { uz: 'Tashkent → Namangan', ru: 'Tashkent → Namangan' },
+    namanganTashkent: { uz: 'Namangan → Tashkent', ru: 'Namangan → Tashkent' },
   },
 }

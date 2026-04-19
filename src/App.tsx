@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { mockUser } from './data/mock'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { mockUser, routeLabels } from './data/mock'
 import AppLayout from './layout/AppLayout'
 import AuthScreen from './screens/AuthScreen'
 import HomeScreen from './screens/HomeScreen'
@@ -33,6 +34,20 @@ function isNetworkFetchError(error: unknown) {
   )
 }
 
+// Create a client for React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      staleTime: 30_000, // 30 seconds
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+})
+
 export default function App() {
   const { t } = useLanguage()
   const [tab, setTab] = useState<TabKey>('home')
@@ -48,11 +63,6 @@ export default function App() {
       : tab === 'orders'
         ? t('header.ordersSubtitle')
         : t('header.profileSubtitle')
-
-  const getRouteLabel = (routeId: RequestFormData['routeId']) =>
-    routeId === 'kokand-tashkent'
-      ? t('routes.kokandTashkent')
-      : t('routes.tashkentKokand')
 
   useEffect(() => {
     const webApp = getTelegramWebApp()
@@ -202,7 +212,7 @@ export default function App() {
     const nextOrder: RideRequest = {
       id: bookingId,
       routeId: request.routeId,
-      routeLabel: getRouteLabel(request.routeId),
+      routeLabel: routeLabels[request.routeId],
       dateISO: request.dateISO,
       time: request.time,
       passengerPhone: request.passengerPhone,
@@ -238,7 +248,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <AppLayout
         activeTab={tab}
         onTabChange={setTab}
@@ -285,6 +295,6 @@ export default function App() {
           </div>
         </div>
       ) : null}
-    </>
+    </QueryClientProvider>
   )
 }

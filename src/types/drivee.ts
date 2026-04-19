@@ -1,4 +1,10 @@
-export type RouteId = 'kokand-tashkent' | 'tashkent-kokand'
+export type RouteId =
+  | 'kokand-tashkent'
+  | 'tashkent-kokand'
+  | 'tashkent-samarkand'
+  | 'samarkand-tashkent'
+  | 'tashkent-namangan'
+  | 'namangan-tashkent'
 
 export type TabKey = 'home' | 'orders' | 'profile'
 
