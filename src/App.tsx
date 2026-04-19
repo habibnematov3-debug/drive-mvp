@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { mockUser, routeLabels } from './data/mock'
+import { routeLabels } from './data/mock'
 import AppLayout from './layout/AppLayout'
 import AuthScreen from './screens/AuthScreen'
 import HomeScreen from './screens/HomeScreen'
@@ -71,7 +71,6 @@ export default function App() {
 
     const telegramUser = getTelegramUser()
     const initData = getTelegramInitData()
-    const isDevBypass = import.meta.env.DEV && (!telegramUser?.id || !initData)
     const apiBaseUrl = getApiBaseUrl()
 
     if (!apiBaseUrl) {
@@ -82,22 +81,19 @@ export default function App() {
     }
 
     if (!telegramUser?.id || !initData) {
-      if (!isDevBypass) {
-        setPassenger(null)
-        setOrders([])
-        setAuthState('telegram_required')
-        setAuthError(null)
-        setIsOrdersLoading(false)
-        return
-      }
+      setPassenger(null)
+      setOrders([])
+      setAuthState('telegram_required')
+      setAuthError(t('auth.telegramLogin'))
+      return
     }
 
     const controller = new AbortController()
 
-    async function loadOrders(devTelegramUserId?: string) {
+    async function loadOrders() {
       const requestsResponse = await fetch(`${apiBaseUrl}/requests`, {
         signal: controller.signal,
-        headers: buildTelegramAuthHeaders(devTelegramUserId),
+        headers: buildTelegramAuthHeaders(telegramUser?.id?.toString()),
       })
       const responseBody = await requestsResponse.text()
       const contentType = requestsResponse.headers.get('content-type') ?? ''
@@ -131,37 +127,32 @@ export default function App() {
       setIsOrdersLoading(false)
 
       try {
-        if (isDevBypass) {
-          setPassenger(mockUser)
-          setAuthState('ready')
-        } else {
-          const authResponse = await fetch(`${apiBaseUrl}/auth/telegram`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ initData }),
-            signal: controller.signal,
-          })
-          const authBody = await authResponse.text()
-          const authContentType = authResponse.headers.get('content-type') ?? ''
+        const authResponse = await fetch(`${apiBaseUrl}/auth/telegram`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData }),
+          signal: controller.signal,
+        })
+        const authBody = await authResponse.text()
+        const authContentType = authResponse.headers.get('content-type') ?? ''
 
-          if (!authContentType.includes('application/json')) {
-            throw new Error(t('auth.failedToLoadProfile'))
-          }
-
-          const authResult = JSON.parse(authBody) as {
-            success?: boolean
-            error?: string
-            user?: Parameters<typeof buildPassengerFromTelegram>[0]
-          }
-
-          if (!authResponse.ok || !authResult.success || !authResult.user?.id) {
-            throw new Error(authResult.error || t('auth.failedToLoadProfile'))
-          }
-
-          const nextPassenger = buildPassengerFromTelegram(authResult.user)
-          setPassenger(nextPassenger)
-          setAuthState('ready')
+        if (!authContentType.includes('application/json')) {
+          throw new Error(t('auth.failedToLoadProfile'))
         }
+
+        const authResult = JSON.parse(authBody) as {
+          success?: boolean
+          error?: string
+          user?: Parameters<typeof buildPassengerFromTelegram>[0]
+        }
+
+        if (!authResponse.ok || !authResult.success || !authResult.user?.id) {
+          throw new Error(authResult.error || t('auth.failedToLoadProfile'))
+        }
+
+        const nextPassenger = buildPassengerFromTelegram(authResult.user)
+        setPassenger(nextPassenger)
+        setAuthState('ready')
       } catch (error) {
         if (controller.signal.aborted) return
         const nextAuthError =
@@ -179,7 +170,7 @@ export default function App() {
 
       setIsOrdersLoading(true)
       try {
-        await loadOrders(isDevBypass ? mockUser.telegramUserId : undefined)
+        await loadOrders()
       } catch (ordersError) {
         if (!controller.signal.aborted) {
           setOrders([])

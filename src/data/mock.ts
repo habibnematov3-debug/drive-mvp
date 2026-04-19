@@ -1,4 +1,4 @@
-import type { Passenger, RouteId } from '../types/drivee'
+import type { RouteId } from '../types/drivee'
 
 export const routeLabels: Record<RouteId, string> = {
   'kokand-tashkent': 'Kokand → Tashkent',
@@ -9,9 +9,4 @@ export const routeLabels: Record<RouteId, string> = {
   'namangan-tashkent': 'Namangan → Tashkent',
 }
 
-export const mockUser: Passenger = {
-  name: 'Local Test User',
-  secondaryLine: 'Browser development mode',
-  languageLabel: "O'zbekcha",
-  telegramUserId: 'dev-local-user',
-}
+// NOTE: mockUser removed for production - use only Telegram authentication
