@@ -46,6 +46,7 @@ const DRIVERS_HEADERS = [
   'registered_at',
 ]
 const BOOKING_STATUS_NEW = 'yangi'
+const BOOKING_STATUS_PENDING = 'kutilmoqda'
 const BOOKING_STATUS_IN_PROGRESS = 'jarayonda'
 
 let sheetsClient = null
@@ -493,6 +494,26 @@ async function updateBookingRow(rowNumber, rowObject) {
   })
 }
 
+function attachDriverToRow(rowObject, driver) {
+  return {
+    ...rowObject,
+    haydovchi_ismi: driver.name,
+    haydovchi_telefon: driver.phone,
+    haydovchi_telegram_id: String(driver.telegramId),
+    haydovchi_mashina: driver.carModel,
+  }
+}
+
+function clearDriverFromRow(rowObject) {
+  return {
+    ...rowObject,
+    haydovchi_ismi: '',
+    haydovchi_telefon: '',
+    haydovchi_telegram_id: '',
+    haydovchi_mashina: '',
+  }
+}
+
 async function storeBookingGroupMessage(bookingId, groupMeta) {
   const booking = await findBookingById(bookingId)
 
@@ -621,14 +642,13 @@ async function claimBooking(bookingId, driver) {
       return { ok: false, reason: 'already_taken', booking: booking.record }
     }
 
-    const nextRow = {
-      ...booking.record.rowObject,
-      holat: BOOKING_STATUS_IN_PROGRESS,
-      haydovchi_ismi: driver.name,
-      haydovchi_telefon: driver.phone,
-      haydovchi_telegram_id: String(driver.telegramId),
-      haydovchi_mashina: driver.carModel,
-    }
+    const nextRow = attachDriverToRow(
+      {
+        ...booking.record.rowObject,
+        holat: BOOKING_STATUS_PENDING,
+      },
+      driver,
+    )
 
     await updateBookingRow(booking.record.rowNumber, nextRow)
 
@@ -636,7 +656,7 @@ async function claimBooking(bookingId, driver) {
       ok: true,
       booking: {
         ...booking.record,
-        status: BOOKING_STATUS_IN_PROGRESS,
+        status: BOOKING_STATUS_PENDING,
         rowObject: nextRow,
         driverName: driver.name,
         driverPhone: driver.phone,
@@ -647,13 +667,105 @@ async function claimBooking(bookingId, driver) {
   })
 }
 
+async function confirmPendingBooking(bookingId, passengerTelegramUserId) {
+  return withBookingLock(bookingId, async () => {
+    const booking = await findBookingById(bookingId)
+
+    if (!booking) {
+      return { ok: false, reason: 'not_found' }
+    }
+
+    if (
+      passengerTelegramUserId &&
+      booking.record.passengerTelegramUserId !== String(passengerTelegramUserId)
+    ) {
+      return { ok: false, reason: 'forbidden', booking: booking.record }
+    }
+
+    if (booking.record.status === BOOKING_STATUS_IN_PROGRESS) {
+      return { ok: false, reason: 'already_confirmed', booking: booking.record }
+    }
+
+    if (booking.record.status !== BOOKING_STATUS_PENDING) {
+      return { ok: false, reason: 'not_pending', booking: booking.record }
+    }
+
+    const nextRow = {
+      ...booking.record.rowObject,
+      holat: BOOKING_STATUS_IN_PROGRESS,
+    }
+
+    await updateBookingRow(booking.record.rowNumber, nextRow)
+
+    return {
+      ok: true,
+      booking: {
+        ...booking.record,
+        status: BOOKING_STATUS_IN_PROGRESS,
+        rowObject: nextRow,
+      },
+    }
+  })
+}
+
+async function resetPendingBooking(bookingId, options = {}) {
+  return withBookingLock(bookingId, async () => {
+    const booking = await findBookingById(bookingId)
+
+    if (!booking) {
+      return { ok: false, reason: 'not_found' }
+    }
+
+    if (
+      options.passengerTelegramUserId &&
+      booking.record.passengerTelegramUserId !== String(options.passengerTelegramUserId)
+    ) {
+      return { ok: false, reason: 'forbidden', booking: booking.record }
+    }
+
+    if (booking.record.status === BOOKING_STATUS_NEW) {
+      return { ok: false, reason: 'already_open', booking: booking.record }
+    }
+
+    if (booking.record.status === BOOKING_STATUS_IN_PROGRESS) {
+      return { ok: false, reason: 'already_confirmed', booking: booking.record }
+    }
+
+    if (booking.record.status !== BOOKING_STATUS_PENDING) {
+      return { ok: false, reason: 'not_pending', booking: booking.record }
+    }
+
+    const nextRow = clearDriverFromRow({
+      ...booking.record.rowObject,
+      holat: BOOKING_STATUS_NEW,
+    })
+
+    await updateBookingRow(booking.record.rowNumber, nextRow)
+
+    return {
+      ok: true,
+      booking: {
+        ...booking.record,
+        status: BOOKING_STATUS_NEW,
+        rowObject: nextRow,
+        driverName: '',
+        driverPhone: '',
+        driverTelegramId: '',
+        driverCarModel: '',
+      },
+    }
+  })
+}
+
 module.exports = {
   appendBooking,
   claimBooking,
+  confirmPendingBooking,
   ensureHeader,
   getDriverByTelegramId,
   listBookingsByTelegramUser,
   registerDriver,
+  resetPendingBooking,
   storeBookingGroupMessage,
   upsertTelegramUser,
   HEADERS: BOOKINGS_HEADERS,

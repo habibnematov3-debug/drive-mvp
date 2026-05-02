@@ -1,8 +1,10 @@
 const { Markup, Telegraf } = require('telegraf')
 const {
   claimBooking,
+  confirmPendingBooking,
   getDriverByTelegramId,
   registerDriver,
+  resetPendingBooking,
   storeBookingGroupMessage,
 } = require('./sheets')
 
@@ -10,7 +12,9 @@ let bot = null
 let botStarted = false
 let botHandlersAttached = false
 const driverRegistrationSessions = new Map()
+const pendingPassengerConfirmations = new Map()
 const PHONE_REGEX = /^\+998\d{9}$/
+const PASSENGER_CONFIRMATION_TIMEOUT_MS = 5 * 60 * 1000
 
 function getBot() {
   if (!bot) {
@@ -19,12 +23,6 @@ function getBot() {
   }
 
   return bot
-}
-
-function getDriverDisplayName(user) {
-  if (!user) return 'Haydovchi'
-  const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim()
-  return fullName || user.username || 'Haydovchi'
 }
 
 function formatDate(isoDate) {
@@ -46,6 +44,7 @@ function formatGenderLabel(passengerGender) {
 }
 
 function buildGroupMessage(bookingId, data, options = {}) {
+  const statusLabel = options.statusLabel || 'yangi'
   const lines = [
     `Yangi ariza #${bookingId}`,
     '',
@@ -69,9 +68,9 @@ function buildGroupMessage(bookingId, data, options = {}) {
   }
 
   lines.push(`Izoh: ${data.comment || '-'}`)
-  lines.push(`Holat: ${options.taken ? '🚗 Olindi' : 'yangi'}`)
+  lines.push(`Holat: ${statusLabel}`)
 
-  if (options.taken && options.driver) {
+  if (options.driver) {
     lines.push(`Haydovchi: ${options.driver.name}`)
     lines.push(`Telefon: ${options.driver.phone}`)
 
@@ -98,15 +97,42 @@ function buildUserConfirmation(bookingId, data) {
   return lines.join('\n')
 }
 
+function buildTakeBookingKeyboard(bookingId) {
+  return Markup.inlineKeyboard([
+    Markup.button.callback('✅ Olish', `take_booking:${bookingId}`),
+  ])
+}
+
+function buildPassengerDecisionKeyboard(bookingId) {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('✅ Tasdiqlash', `passenger_confirm:${bookingId}`),
+      Markup.button.callback('❌ Rad etish', `passenger_reject:${bookingId}`),
+    ],
+  ])
+}
+
+function buildBookingPayloadFromRecord(booking) {
+  return {
+    route: booking.route,
+    date: booking.date,
+    time: booking.time,
+    seats: booking.seats,
+    full_car: booking.rowObject.full_car === 'true',
+    passenger_gender: booking.rowObject.passenger_gender,
+    passenger_name: booking.passengerName,
+    passenger_phone: booking.passengerPhone,
+    comment: booking.comment,
+  }
+}
+
 async function notifyBookingGroup(bookingId, bookingData) {
   const chatId = process.env.BOOKING_GROUP_ID
   const text = buildGroupMessage(bookingId, bookingData)
   const message = await getBot().telegram.sendMessage(
     chatId,
     text,
-    Markup.inlineKeyboard([
-      Markup.button.callback('✅ Olish', `take_booking:${bookingId}`),
-    ]),
+    buildTakeBookingKeyboard(bookingId),
   )
 
   await storeBookingGroupMessage(bookingId, {
@@ -131,6 +157,9 @@ function buildPassengerFoundMessage(driver) {
     lines.push(`Mashina: ${driver.carModel}`)
   }
 
+  lines.push('')
+  lines.push("Agar haydovchi sizga mos bo'lsa, tasdiqlang.")
+
   return lines.join('\n')
 }
 
@@ -150,17 +179,17 @@ function parseRegisterStepMessage(step) {
   }
 
   if (step === 'phone') {
-    return "Telefon raqamingizni +998901234567 formatida yuboring."
+    return 'Telefon raqamingizni +998901234567 formatida yuboring.'
   }
 
-  return "Mashina rusumi va modelini yuboring.\nMasalan: Cobalt 4."
+  return 'Mashina rusumi va modelini yuboring.\nMasalan: Cobalt 4.'
 }
 
 async function handleDriverRegistrationText(ctx, session) {
   const text = String(ctx.message?.text || '').trim()
 
   if (!text) {
-    await ctx.reply("Matn yuboring.")
+    await ctx.reply('Matn yuboring.')
     return true
   }
 
@@ -213,6 +242,82 @@ async function handleDriverRegistrationText(ctx, session) {
   )
 
   return true
+}
+
+function clearPendingConfirmation(bookingId) {
+  const key = String(bookingId || '').trim()
+  const existing = pendingPassengerConfirmations.get(key)
+
+  if (existing?.timeoutId) {
+    clearTimeout(existing.timeoutId)
+  }
+
+  pendingPassengerConfirmations.delete(key)
+  return existing
+}
+
+async function editGroupMessageForStatus(bookingId, booking, options = {}) {
+  if (!booking.groupChatId || !booking.groupMessageId) {
+    return
+  }
+
+  const text = buildGroupMessage(
+    bookingId,
+    buildBookingPayloadFromRecord(booking),
+    {
+      statusLabel: options.statusLabel,
+      driver: options.driver,
+    },
+  )
+
+  const extra = options.restoreButton
+    ? { reply_markup: buildTakeBookingKeyboard(bookingId).reply_markup }
+    : undefined
+
+  await getBot().telegram.editMessageText(
+    booking.groupChatId,
+    Number(booking.groupMessageId),
+    undefined,
+    text,
+    extra,
+  )
+}
+
+async function schedulePendingConfirmation(booking, driver) {
+  clearPendingConfirmation(booking.bookingId)
+
+  const timeoutId = setTimeout(async () => {
+    try {
+      const resetResult = await resetPendingBooking(booking.bookingId)
+
+      if (!resetResult.ok) {
+        return
+      }
+
+      const reopenedBooking = resetResult.booking
+
+      await Promise.allSettled([
+        getBot().telegram.sendMessage(
+          driver.telegramId,
+          "⌛ Yo'lovchi 5 daqiqa ichida javob bermadi. Ariza yana ochildi.",
+        ),
+        editGroupMessageForStatus(booking.bookingId, reopenedBooking, {
+          statusLabel: 'yangi',
+          restoreButton: true,
+        }),
+      ])
+    } catch (error) {
+      console.error('[Bot] Pending confirmation timeout failed:', error.message)
+    } finally {
+      pendingPassengerConfirmations.delete(booking.bookingId)
+    }
+  }, PASSENGER_CONFIRMATION_TIMEOUT_MS)
+
+  pendingPassengerConfirmations.set(booking.bookingId, {
+    timeoutId,
+    driverTelegramId: String(driver.telegramId),
+    passengerTelegramUserId: booking.passengerTelegramUserId,
+  })
 }
 
 function attachBotHandlers(botInstance) {
@@ -289,54 +394,186 @@ function attachBotHandlers(botInstance) {
     }
 
     const { booking } = claimResult
-    const nextText = buildGroupMessage(
-      booking.bookingId,
-      {
-        route: booking.route,
-        date: booking.date,
-        time: booking.time,
-        seats: booking.seats,
-        full_car: booking.rowObject.full_car === 'true',
-        passenger_gender: booking.rowObject.passenger_gender,
-        passenger_name: booking.passengerName,
-        passenger_phone: booking.passengerPhone,
-        comment: booking.comment,
-      },
-      {
-        taken: true,
-        driver,
-      },
-    )
 
     try {
-      await ctx.editMessageText(nextText)
+      await ctx.editMessageText(
+        buildGroupMessage(booking.bookingId, buildBookingPayloadFromRecord(booking), {
+          statusLabel: 'kutilmoqda',
+          driver,
+        }),
+      )
     } catch (error) {
       console.error('[Bot] Failed to update group message:', error.message)
     }
 
-    const notifications = []
-
-    if (booking.passengerTelegramUserId) {
-      notifications.push(
-        ctx.telegram.sendMessage(
-          booking.passengerTelegramUserId,
-          buildPassengerFoundMessage(driver),
-        ),
-      )
+    if (!booking.passengerTelegramUserId) {
+      await resetPendingBooking(booking.bookingId)
+      await editGroupMessageForStatus(booking.bookingId, booking, {
+        statusLabel: 'yangi',
+        restoreButton: true,
+      }).catch((error) => {
+        console.error('[Bot] Failed to restore group message:', error.message)
+      })
+      await ctx.answerCbQuery("Yo'lovchi bilan bog'lanib bo'lmadi.")
+      return
     }
 
-    notifications.push(
-      ctx.telegram.sendMessage(telegramId, buildDriverPassengerMessage(booking)),
+    try {
+      await ctx.telegram.sendMessage(
+        booking.passengerTelegramUserId,
+        buildPassengerFoundMessage(driver),
+        buildPassengerDecisionKeyboard(booking.bookingId),
+      )
+    } catch (error) {
+      console.error('[Bot] Failed to notify passenger:', error.message)
+      const resetResult = await resetPendingBooking(booking.bookingId)
+      if (resetResult.ok) {
+        await editGroupMessageForStatus(booking.bookingId, resetResult.booking, {
+          statusLabel: 'yangi',
+          restoreButton: true,
+        }).catch((groupError) => {
+          console.error('[Bot] Failed to restore group message:', groupError.message)
+        })
+      }
+      await ctx.telegram.sendMessage(
+        telegramId,
+        "Yo'lovchiga tasdiqlash xabari yuborilmadi. Ariza qayta ochildi.",
+      ).catch((notifyError) => {
+        console.error('[Bot] Failed to notify driver:', notifyError.message)
+      })
+      await ctx.answerCbQuery("Yo'lovchiga xabar yuborilmadi.")
+      return
+    }
+
+    await schedulePendingConfirmation(booking, driver)
+    await ctx.answerCbQuery("Yo'lovchi tasdig'i kutilmoqda.")
+  })
+
+  botInstance.action(/^passenger_confirm:(.+)$/, async (ctx) => {
+    const bookingId = String(ctx.match?.[1] || '').trim()
+    const telegramId = String(ctx.from?.id || '')
+
+    if (!bookingId || !telegramId) {
+      await ctx.answerCbQuery("Arizani aniqlab bo'lmadi.")
+      return
+    }
+
+    const confirmResult = await confirmPendingBooking(bookingId, telegramId)
+
+    if (!confirmResult.ok) {
+      const message =
+        confirmResult.reason === 'already_confirmed'
+          ? 'Bu ariza allaqachon tasdiqlangan.'
+          : confirmResult.reason === 'forbidden'
+            ? "Bu tugma siz uchun emas."
+            : "Bu ariza endi tasdiqlashni kutmayapti."
+
+      await ctx.answerCbQuery(message, {
+        show_alert: confirmResult.reason === 'forbidden',
+      })
+      return
+    }
+
+    const pending = clearPendingConfirmation(bookingId)
+    const booking = confirmResult.booking
+
+    try {
+      await editGroupMessageForStatus(bookingId, booking, {
+        statusLabel: 'jarayonda',
+        driver: {
+          name: booking.driverName,
+          phone: booking.driverPhone,
+          carModel: booking.driverCarModel,
+        },
+      })
+    } catch (error) {
+      console.error('[Bot] Failed to mark group message as confirmed:', error.message)
+    }
+
+    await ctx.editMessageText(
+      [
+        '✅ Haydovchi tasdiqlandi!',
+        `Haydovchi: ${booking.driverName}`,
+        `Tel: ${booking.driverPhone}`,
+        booking.driverCarModel ? `Mashina: ${booking.driverCarModel}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n'),
     )
 
-    const results = await Promise.allSettled(notifications)
-    results.forEach((result) => {
-      if (result.status === 'rejected') {
-        console.error('[Bot] Notification failed:', result.reason?.message || result.reason)
+    if (pending?.driverTelegramId) {
+      try {
+        await ctx.telegram.sendMessage(
+          pending.driverTelegramId,
+          "✅ Yo'lovchi tasdiqladi! Yo'lga chiqishingiz mumkin.",
+        )
+        await ctx.telegram.sendMessage(
+          pending.driverTelegramId,
+          buildDriverPassengerMessage(booking),
+        )
+      } catch (error) {
+        console.error('[Bot] Failed to notify driver after confirmation:', error.message)
       }
+    }
+
+    await ctx.answerCbQuery('Tasdiqlandi.')
+  })
+
+  botInstance.action(/^passenger_reject:(.+)$/, async (ctx) => {
+    const bookingId = String(ctx.match?.[1] || '').trim()
+    const telegramId = String(ctx.from?.id || '')
+
+    if (!bookingId || !telegramId) {
+      await ctx.answerCbQuery("Arizani aniqlab bo'lmadi.")
+      return
+    }
+
+    const rejectResult = await resetPendingBooking(bookingId, {
+      passengerTelegramUserId: telegramId,
     })
 
-    await ctx.answerCbQuery('Ariza sizga biriktirildi.')
+    if (!rejectResult.ok) {
+      const message =
+        rejectResult.reason === 'forbidden'
+          ? "Bu tugma siz uchun emas."
+          : rejectResult.reason === 'already_confirmed'
+            ? 'Bu ariza allaqachon tasdiqlangan.'
+            : "Bu ariza endi rad etishni kutmayapti."
+
+      await ctx.answerCbQuery(message, {
+        show_alert: rejectResult.reason === 'forbidden',
+      })
+      return
+    }
+
+    const pending = clearPendingConfirmation(bookingId)
+    const booking = rejectResult.booking
+
+    try {
+      await editGroupMessageForStatus(bookingId, booking, {
+        statusLabel: 'yangi',
+        restoreButton: true,
+      })
+    } catch (error) {
+      console.error('[Bot] Failed to restore group message:', error.message)
+    }
+
+    await ctx.editMessageText(
+      "❌ Siz bu haydovchini rad etdingiz. Ariza boshqa haydovchilar uchun yana ochildi.",
+    )
+
+    if (pending?.driverTelegramId) {
+      try {
+        await ctx.telegram.sendMessage(
+          pending.driverTelegramId,
+          "❌ Yo'lovchi boshqa haydovchi tanladi.",
+        )
+      } catch (error) {
+        console.error('[Bot] Failed to notify driver after rejection:', error.message)
+      }
+    }
+
+    await ctx.answerCbQuery('Ariza qayta ochildi.')
   })
 }
 
