@@ -7,7 +7,7 @@ import { getApiBaseUrl } from '../utils/api'
 import { buildTelegramAuthHeaders } from '../utils/telegram'
 
 type HomeScreenProps = {
-  onSubmitRequest: (payload: RequestFormData, bookingId: string) => void
+  onSubmitRequest: (payload: RequestFormData, bookingId: string) => Promise<void> | void
   passengerName?: string
   telegramUserId?: string
 }

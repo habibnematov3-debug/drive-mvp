@@ -58,6 +58,51 @@ const ROUTE_LABELS_BY_ID = {
   'namangan-tashkent': 'Namangan -> Tashkent',
 }
 
+const ROUTE_ALIASES = {
+  'kokand -> tashkent': 'kokand-tashkent',
+  'kokand → tashkent': 'kokand-tashkent',
+  'kokand в†’ tashkent': 'kokand-tashkent',
+  'kokand to tashkent': 'kokand-tashkent',
+  'kokand tashkent': 'kokand-tashkent',
+  'qoqon -> toshkent': 'kokand-tashkent',
+  "qo'qon -> toshkent": 'kokand-tashkent',
+  'токанд -> ташкент': 'kokand-tashkent',
+  'коканд -> ташкент': 'kokand-tashkent',
+
+  'tashkent -> kokand': 'tashkent-kokand',
+  'tashkent → kokand': 'tashkent-kokand',
+  'tashkent в†’ kokand': 'tashkent-kokand',
+  'tashkent to kokand': 'tashkent-kokand',
+  'tashkent kokand': 'tashkent-kokand',
+  'toshkent -> qoqon': 'tashkent-kokand',
+  "toshkent -> qo'qon": 'tashkent-kokand',
+  'ташкент -> коканд': 'tashkent-kokand',
+
+  'tashkent -> samarkand': 'tashkent-samarkand',
+  'tashkent → samarkand': 'tashkent-samarkand',
+  'tashkent в†’ samarkand': 'tashkent-samarkand',
+  'toshkent -> samarqand': 'tashkent-samarkand',
+  'ташкент -> самарканд': 'tashkent-samarkand',
+
+  'samarkand -> tashkent': 'samarkand-tashkent',
+  'samarkand → tashkent': 'samarkand-tashkent',
+  'samarkand в†’ tashkent': 'samarkand-tashkent',
+  'samarqand -> toshkent': 'samarkand-tashkent',
+  'самарканд -> ташкент': 'samarkand-tashkent',
+
+  'tashkent -> namangan': 'tashkent-namangan',
+  'tashkent → namangan': 'tashkent-namangan',
+  'tashkent в†’ namangan': 'tashkent-namangan',
+  'toshkent -> namangan': 'tashkent-namangan',
+  'ташкент -> наманган': 'tashkent-namangan',
+
+  'namangan -> tashkent': 'namangan-tashkent',
+  'namangan → tashkent': 'namangan-tashkent',
+  'namangan в†’ tashkent': 'namangan-tashkent',
+  'namangan -> toshkent': 'namangan-tashkent',
+  'наманган -> ташкент': 'namangan-tashkent',
+}
+
 let sheetsClient = null
 const bookingLocks = new Map()
 
@@ -323,11 +368,26 @@ function mapStatus(status) {
 function mapRouteId(routeLabel) {
   const normalized = String(routeLabel || '')
     .trim()
-    .replace(/→/g, '->')
+    .replace(/\s+/g, ' ')
     .toLowerCase()
 
+  if (ROUTE_ALIASES[normalized]) {
+    return ROUTE_ALIASES[normalized]
+  }
+
+  const normalizedArrow = normalized
+    .replace(/→/g, '->')
+    .replace(/в†’/g, '->')
+    .replace(/\s*-\s*>/g, ' -> ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (ROUTE_ALIASES[normalizedArrow]) {
+    return ROUTE_ALIASES[normalizedArrow]
+  }
+
   const match = Object.entries(ROUTE_LABELS_BY_ID).find(([, label]) => {
-    return label.toLowerCase() === normalized
+    return label.toLowerCase() === normalizedArrow
   })
 
   return match?.[0] || null

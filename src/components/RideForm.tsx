@@ -21,7 +21,7 @@ import {
 } from '../utils/format'
 
 type RideFormProps = {
-  onSubmitRequest: (payload: RequestFormData, bookingId: string) => void
+  onSubmitRequest: (payload: RequestFormData, bookingId: string) => Promise<void> | void
   isSubmitting?: boolean
   submitError?: string | null
 }
@@ -82,7 +82,7 @@ export default function RideForm({
     // Generate a simple booking ID for now
     const bookingId = `BK${Date.now()}`
     
-    onSubmitRequest(requestPayload, bookingId)
+    await Promise.resolve(onSubmitRequest(requestPayload, bookingId))
     setIsSubmitted(true)
   }
 
