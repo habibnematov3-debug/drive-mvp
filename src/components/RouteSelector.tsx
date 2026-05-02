@@ -9,16 +9,16 @@ type RouteSelectorProps = {
 
 type RouteOption = {
   id: RouteId
-  label: string
+  labelKey: string
 }
 
 const ROUTE_OPTIONS: RouteOption[] = [
-  { id: 'kokand-tashkent', label: 'Kokand → Tashkent' },
-  { id: 'tashkent-kokand', label: 'Tashkent → Kokand' },
-  { id: 'tashkent-samarkand', label: 'Tashkent → Samarkand' },
-  { id: 'samarkand-tashkent', label: 'Samarkand → Tashkent' },
-  { id: 'tashkent-namangan', label: 'Tashkent → Namangan' },
-  { id: 'namangan-tashkent', label: 'Namangan → Tashkent' },
+  { id: 'kokand-tashkent', labelKey: 'routes.kokandTashkent' },
+  { id: 'tashkent-kokand', labelKey: 'routes.tashkentKokand' },
+  { id: 'tashkent-samarkand', labelKey: 'routes.tashkentSamarkand' },
+  { id: 'samarkand-tashkent', labelKey: 'routes.samarkandTashkent' },
+  { id: 'tashkent-namangan', labelKey: 'routes.tashkentNamangan' },
+  { id: 'namangan-tashkent', labelKey: 'routes.namanganTashkent' },
 ]
 
 export default function RouteSelector({
@@ -42,7 +42,7 @@ export default function RouteSelector({
         >
           {ROUTE_OPTIONS.map((opt) => (
             <option key={opt.id} value={opt.id}>
-              {opt.label}
+              {t(opt.labelKey)}
             </option>
           ))}
         </select>

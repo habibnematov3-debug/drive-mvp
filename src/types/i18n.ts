@@ -24,6 +24,7 @@ export interface Translations {
     save: LanguageLabel
     delete: LanguageLabel
     back: LanguageLabel
+    refresh: LanguageLabel
   }
   auth: {
     telegramLogin: LanguageLabel
@@ -65,6 +66,11 @@ export interface Translations {
     newBooking: LanguageLabel
     summaryTitle: LanguageLabel
     summaryHint: LanguageLabel
+    title: LanguageLabel
+    subtitle: LanguageLabel
+    successTitle: LanguageLabel
+    successMessage: LanguageLabel
+    submitError: LanguageLabel
   }
   orders: {
     title: LanguageLabel
@@ -96,6 +102,11 @@ export interface Translations {
     sendQuestion: LanguageLabel
     logout: LanguageLabel
     logoutConfirm: LanguageLabel
+    contactSupport: LanguageLabel
+    preferences: LanguageLabel
+    account: LanguageLabel
+    userId: LanguageLabel
+    languageValue: LanguageLabel
   }
   status: {
     submitted: LanguageLabel

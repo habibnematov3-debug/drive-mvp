@@ -1,6 +1,10 @@
 const ROUTE_LABELS_BY_ID = {
-  'kokand-tashkent': 'Kokand → Tashkent',
-  'tashkent-kokand': 'Tashkent → Kokand',
+  'kokand-tashkent': 'Kokand -> Tashkent',
+  'tashkent-kokand': 'Tashkent -> Kokand',
+  'tashkent-samarkand': 'Tashkent -> Samarkand',
+  'samarkand-tashkent': 'Samarkand -> Tashkent',
+  'tashkent-namangan': 'Tashkent -> Namangan',
+  'namangan-tashkent': 'Namangan -> Tashkent',
 }
 
 const VALID_ROUTE_IDS = Object.keys(ROUTE_LABELS_BY_ID)
@@ -24,25 +28,16 @@ function normalizeRouteId(routeId) {
 
 function normalizeRouteLabel(route) {
   const normalized = normalizeString(route)
-    .replace(/->/g, '→')
+    .replace(/→/g, '->')
     .replace(/\s+/g, ' ')
     .trim()
+    .toLowerCase()
 
-  if (
-    normalized.toLowerCase() === 'kokand → tashkent' ||
-    normalized.toLowerCase() === 'kokand tashkent'
-  ) {
-    return ROUTE_LABELS_BY_ID['kokand-tashkent']
-  }
+  const match = Object.entries(ROUTE_LABELS_BY_ID).find(([, label]) => {
+    return label.toLowerCase() === normalized
+  })
 
-  if (
-    normalized.toLowerCase() === 'tashkent → kokand' ||
-    normalized.toLowerCase() === 'tashkent kokand'
-  ) {
-    return ROUTE_LABELS_BY_ID['tashkent-kokand']
-  }
-
-  return normalized
+  return match?.[1] || normalizeString(route)
 }
 
 function normalizeBoolean(value) {

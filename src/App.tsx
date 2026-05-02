@@ -21,6 +21,7 @@ import {
 } from './utils/telegram'
 
 type AuthState = 'loading' | 'ready' | 'telegram_required' | 'error'
+const SUPPORT_TELEGRAM_URL = 'https://t.me/drivee_inc'
 
 function isNetworkFetchError(error: unknown) {
   if (!(error instanceof Error)) return false
@@ -259,19 +260,8 @@ export default function App() {
     setOrders((prev) => [nextOrder, ...prev])
   }
 
-  function showToast(message: string) {
-    setToast(message)
-  }
-
   function handleSupport() {
-    const supportUrl = import.meta.env.VITE_TELEGRAM_BOT_URL?.trim()
-
-    if (supportUrl) {
-      openTelegramUrl(supportUrl)
-      return
-    }
-
-    showToast('VITE_TELEGRAM_BOT_URL is not configured')
+    openTelegramUrl(SUPPORT_TELEGRAM_URL)
   }
 
   function handleLogout() {
@@ -292,13 +282,10 @@ export default function App() {
             errorMessage={authError}
             canOpenTelegram={
               authState === 'telegram_required' &&
-              Boolean(import.meta.env.VITE_TELEGRAM_BOT_URL?.trim())
+              true
             }
             onOpenTelegram={() => {
-              const supportUrl = import.meta.env.VITE_TELEGRAM_BOT_URL?.trim()
-              if (supportUrl) {
-                openTelegramUrl(supportUrl)
-              }
+              openTelegramUrl(SUPPORT_TELEGRAM_URL)
             }}
             onRetry={() => window.location.reload()}
           />

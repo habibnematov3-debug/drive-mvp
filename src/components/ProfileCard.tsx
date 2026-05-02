@@ -1,12 +1,18 @@
 import { useLanguage } from '../contexts/LanguageContext'
 import LanguageSelector from './LanguageSelector'
 import type { Passenger } from '../types/drivee'
-import { MessageCircle, LogOut, ChevronRight, MapPin } from 'lucide-react'
+import { MessageCircle, LogOut, ChevronRight, MapPin, Languages } from 'lucide-react'
 
 type ProfileCardProps = {
   passenger: Passenger
   onLogout: () => void
   onSupport: () => void
+}
+
+function formatProfileId(telegramUserId?: string) {
+  const normalized = String(telegramUserId || '').trim()
+  if (!normalized) return 'DRV-001'
+  return `DRV-${normalized.slice(-4)}`
 }
 
 export default function ProfileCard({
@@ -19,10 +25,9 @@ export default function ProfileCard({
 
   return (
     <div className="space-y-4 px-1 pb-10">
-      {/* Main User Card */}
       <section className="relative overflow-hidden rounded-[32px] border border-brand-line bg-white p-6 shadow-soft">
         <div className="absolute -right-4 -top-4 h-32 w-32 rounded-full bg-brand-blue/5" />
-        
+
         <div className="flex items-center gap-4">
           <div className="relative">
             {passenger.avatarUrl ? (
@@ -40,56 +45,55 @@ export default function ProfileCard({
               <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
             </div>
           </div>
-          
+
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-black text-brand-ink leading-tight">
               {passenger.name}
             </h2>
             <div className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-brand-muted">
               <MapPin className="h-3.5 w-3.5 text-brand-blue" />
-              {passenger.secondaryLine || 'Member'}
+              {passenger.secondaryLine || passenger.languageLabel || 'Telegram'}
             </div>
           </div>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <div className="rounded-[22px] bg-brand-soft/80 p-3 text-center">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-brand-muted">ID</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-brand-muted">
+              {t('profile.userId')}
+            </div>
             <div className="mt-0.5 text-xs font-black text-brand-ink">
-              {passenger.telegramUserId?.slice(0, 8) || 'USR-482'}
+              {formatProfileId(passenger.telegramUserId)}
             </div>
           </div>
           <div className="rounded-[22px] bg-brand-soft/80 p-3 text-center">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-brand-muted">Points</div>
-            <div className="mt-0.5 text-xs font-black text-emerald-600">+120</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-brand-muted">
+              {t('profile.language')}
+            </div>
+            <div className="mt-0.5 flex items-center justify-center gap-1 text-xs font-black text-brand-ink">
+              <Languages className="h-3.5 w-3.5 text-brand-blue" />
+              {passenger.languageLabel || t('profile.languageValue')}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Settings Sections */}
       <div className="space-y-3">
         <div className="px-5 text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted/70">
-          Preferences
+          {t('profile.preferences')}
         </div>
-        
+
         <section className="rounded-[32px] border border-brand-line bg-white p-4 shadow-soft">
           <LanguageSelector />
         </section>
 
         <div className="px-5 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted/70">
-          Account
+          {t('profile.account')}
         </div>
 
-        <a
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onClick={onSupport}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              onSupport()
-            }
-          }}
           className="group block w-full rounded-[28px] border border-brand-line bg-white p-4 text-left shadow-soft transition-all hover:border-brand-blue/50 active:scale-[0.98]"
         >
           <div className="flex items-center justify-between">
@@ -99,14 +103,14 @@ export default function ProfileCard({
               </div>
               <div>
                 <div className="text-sm font-black text-brand-ink">
-                  {t('profile.contactSupport') || 'Contact Support'}
+                  {t('profile.contactSupport')}
                 </div>
-                <div className="text-xs font-bold text-brand-muted">@gmkhn</div>
+                <div className="text-xs font-bold text-brand-muted">@drivee_inc</div>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 text-brand-muted group-hover:text-brand-blue" />
           </div>
-        </a>
+        </button>
 
         <button
           type="button"

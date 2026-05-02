@@ -95,18 +95,16 @@ export function buildPassengerFromTelegram(
   }
 
   const name = formatTelegramDisplayName(user)
-  const secondaryLine =
-    user.username
-      ? `@${user.username}`
-      : user.id
-        ? `Telegram ID: ${user.id}`
-        : ''
+  const secondaryLine = user.username
+    ? `@${user.username}`
+    : user.id
+      ? `Telegram ID: ${user.id}`
+      : ''
 
   return {
     name: name || 'Telegram user',
     secondaryLine,
-    languageLabel:
-      normalizeLanguageLabel(user.language_code) ?? '',
+    languageLabel: normalizeLanguageLabel(user.language_code) ?? '',
     avatarUrl: user.photo_url,
     telegramUserId: user.id ? String(user.id) : '',
   }

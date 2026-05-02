@@ -49,6 +49,15 @@ const BOOKING_STATUS_NEW = 'yangi'
 const BOOKING_STATUS_PENDING = 'kutilmoqda'
 const BOOKING_STATUS_IN_PROGRESS = 'jarayonda'
 
+const ROUTE_LABELS_BY_ID = {
+  'kokand-tashkent': 'Kokand -> Tashkent',
+  'tashkent-kokand': 'Tashkent -> Kokand',
+  'tashkent-samarkand': 'Tashkent -> Samarkand',
+  'samarkand-tashkent': 'Samarkand -> Tashkent',
+  'tashkent-namangan': 'Tashkent -> Namangan',
+  'namangan-tashkent': 'Namangan -> Tashkent',
+}
+
 let sheetsClient = null
 const bookingLocks = new Map()
 
@@ -86,9 +95,7 @@ function formatGenderLabel(passengerGender) {
 }
 
 function buildCommentCell(bookingData) {
-  const parts = [
-    `To'liq mashina: ${bookingData.full_car ? 'ha' : "yo'q"}`,
-  ]
+  const parts = [`To'liq mashina: ${bookingData.full_car ? 'ha' : "yo'q"}`]
 
   if (bookingData.passenger_gender && bookingData.passenger_gender !== 'any') {
     parts.push(`Mijoz jinsi: ${formatGenderLabel(bookingData.passenger_gender)}`)
@@ -117,14 +124,7 @@ async function getSheetsClient() {
 }
 
 function createBookingId() {
-  if (typeof crypto.randomUUID === 'function') {
-    return `AR-${crypto.randomUUID().toUpperCase()}`
-  }
-
-  return `AR-${Date.now().toString(36).toUpperCase()}-${crypto
-    .randomBytes(3)
-    .toString('hex')
-    .toUpperCase()}`
+  return `AR-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
 }
 
 async function appendBooking(bookingData) {
@@ -320,15 +320,17 @@ function mapStatus(status) {
   return 'submitted'
 }
 
-const ROUTE_LABELS_BY_ID = {
-  'kokand-tashkent': 'Kokand → Tashkent',
-  'tashkent-kokand': 'Tashkent → Kokand',
-}
-
 function mapRouteId(routeLabel) {
-  if (routeLabel === 'Kokand → Tashkent') return 'kokand-tashkent'
-  if (routeLabel === 'Tashkent → Kokand') return 'tashkent-kokand'
-  return null
+  const normalized = String(routeLabel || '')
+    .trim()
+    .replace(/→/g, '->')
+    .toLowerCase()
+
+  const match = Object.entries(ROUTE_LABELS_BY_ID).find(([, label]) => {
+    return label.toLowerCase() === normalized
+  })
+
+  return match?.[0] || null
 }
 
 function normalizeBookingId(value) {
@@ -363,10 +365,7 @@ async function listBookingsByTelegramUser(telegramUserId) {
     .map((row) => {
       const routeId = row.route_id || mapRouteId(row.yonalish || '')
       const comment = row.izoh || ''
-
-      const routeLabel = routeId
-        ? ROUTE_LABELS_BY_ID[routeId]
-        : row.yonalish || ''
+      const routeLabel = routeId ? ROUTE_LABELS_BY_ID[routeId] : row.yonalish || ''
 
       return {
         id: normalizeBookingId(row.buyurtma_id),
@@ -412,11 +411,14 @@ function withBookingLock(bookingId, task) {
   const key = normalizeBookingId(bookingId)
   const previous = bookingLocks.get(key) || Promise.resolve()
   const current = previous.catch(() => undefined).then(task)
-  bookingLocks.set(key, current.finally(() => {
-    if (bookingLocks.get(key) === current) {
-      bookingLocks.delete(key)
-    }
-  }))
+  bookingLocks.set(
+    key,
+    current.finally(() => {
+      if (bookingLocks.get(key) === current) {
+        bookingLocks.delete(key)
+      }
+    }),
+  )
   return current
 }
 
@@ -464,9 +466,7 @@ async function findBookingById(bookingId) {
   const normalizedId = normalizeBookingId(bookingId)
   const { sheets, spreadsheetId, headers, dataRows } = await getBookingRows()
 
-  const rowIndex = dataRows.findIndex(
-    (row) => normalizeBookingId(row[0]) === normalizedId,
-  )
+  const rowIndex = dataRows.findIndex((row) => normalizeBookingId(row[0]) === normalizedId)
 
   if (rowIndex < 0) {
     return null

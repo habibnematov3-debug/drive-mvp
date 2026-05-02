@@ -1,5 +1,5 @@
 import { useLanguage } from '../contexts/LanguageContext'
-import type { RequestStatus, RideRequest } from '../types/drivee'
+import type { RequestStatus, RideRequest, RouteId } from '../types/drivee'
 import {
   formatDateUz,
   formatPassengerCount,
@@ -10,6 +10,23 @@ type OrderCardProps = {
   order: RideRequest
 }
 
+const ROUTE_TITLE_KEYS: Record<RouteId, string> = {
+  'kokand-tashkent': 'routes.kokandTashkent',
+  'tashkent-kokand': 'routes.tashkentKokand',
+  'tashkent-samarkand': 'routes.tashkentSamarkand',
+  'samarkand-tashkent': 'routes.samarkandTashkent',
+  'tashkent-namangan': 'routes.tashkentNamangan',
+  'namangan-tashkent': 'routes.namanganTashkent',
+}
+
+function formatDisplayId(id: string) {
+  const normalized = String(id || '').trim()
+  if (!normalized) return ''
+
+  const compact = normalized.replace(/^AR-/, '')
+  return `AR-${compact.slice(-6).toUpperCase()}`
+}
+
 function StatusBadge({
   status,
   t,
@@ -17,10 +34,7 @@ function StatusBadge({
   status: RequestStatus
   t: (key: string) => string
 }) {
-  const config: Record<
-    string,
-    { label: string; color: string }
-  > = {
+  const config: Record<string, { label: string; color: string }> = {
     submitted: {
       label: t('status.submitted'),
       color: 'bg-brand-blue/15 text-brand-blue border-brand-blue/30',
@@ -35,7 +49,7 @@ function StatusBadge({
     },
   }
 
-  const { label, color } = config[status] ?? config['submitted']
+  const { label, color } = config[status] ?? config.submitted
 
   return (
     <span
@@ -48,14 +62,11 @@ function StatusBadge({
 
 export default function OrderCard({ order }: OrderCardProps) {
   const { language, t } = useLanguage()
-  const routeTitle =
-    order.routeId === 'kokand-tashkent'
-      ? t('routes.kokandTashkent')
-      : t('routes.tashkentKokand')
+  const routeTitle = t(ROUTE_TITLE_KEYS[order.routeId] || 'routes.kokandTashkent')
 
   const createdAtDate = order.createdAtISO
     ? new Date(order.createdAtISO).toLocaleDateString(
-        language === 'ru' ? 'ru-RU' : 'uz-UZ'
+        language === 'ru' ? 'ru-RU' : 'uz-UZ',
       )
     : ''
 
@@ -147,7 +158,7 @@ export default function OrderCard({ order }: OrderCardProps) {
           <span className="rounded-md bg-brand-soft px-2 py-0.5 uppercase tracking-wide">
             {t('orders.hasBag')}
           </span>
-         ) : null}
+        ) : null}
         {order.passengerGender !== 'any' ? (
           <span className="rounded-md bg-brand-soft px-2 py-0.5 uppercase tracking-wide">
             {formatPassengerGender(order.passengerGender, t)}
@@ -188,7 +199,7 @@ export default function OrderCard({ order }: OrderCardProps) {
 
       <div className="mt-3 flex items-center justify-between border-t border-brand-line pt-3">
         <div className="text-[10px] font-medium text-brand-muted/70">
-          ID: {order.id}
+          ID: {formatDisplayId(order.id)}
         </div>
         <div className="text-[10px] font-medium text-brand-muted/70">
           {createdAtDate}

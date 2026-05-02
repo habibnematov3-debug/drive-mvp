@@ -18,7 +18,7 @@ export default function LanguageSelector({ onLanguageChange }: LanguageSelectorP
       <div className="flex items-center justify-between">
         <div className="text-xs text-brand-muted">{t('profile.language')}</div>
         <div className="text-sm font-semibold text-brand-ink">
-          {language === 'ru' ? 'Russkiy' : "O'zbekcha"}
+          {language === 'ru' ? 'Русский' : "O'zbekcha"}
         </div>
       </div>
 
@@ -43,7 +43,7 @@ export default function LanguageSelector({ onLanguageChange }: LanguageSelectorP
               : 'rounded-[14px] px-3 py-2 text-sm font-semibold text-brand-ink hover:bg-white/70'
           }
         >
-          Russkiy
+          Русский
         </button>
       </div>
     </div>
