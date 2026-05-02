@@ -1,13 +1,14 @@
 require('dotenv').config()
 
 const app = require('./app')
-const { getBot } = require('./src/bot')
+const { getBot, startBot } = require('./src/bot')
 
 const PORT = Number(process.env.PORT || 3000)
 
 async function start() {
   try {
     await app.getStartupPromise()
+    await startBot()
 
     app.listen(PORT, () => {
       console.log(`[Server] Running on port ${PORT}`)

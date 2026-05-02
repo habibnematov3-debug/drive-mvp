@@ -163,6 +163,29 @@ export default function OrderCard({ order }: OrderCardProps) {
         </div>
       ) : null}
 
+      {order.status === 'matched' && order.driver ? (
+        <div className="mt-3 rounded-[22px] border border-emerald-500/20 bg-emerald-500/[0.06] p-3">
+          <div className="text-xs font-black uppercase tracking-wider text-emerald-700">
+            {`🚗 ${t('orders.driverFound')}`}
+          </div>
+          <div className="mt-2 space-y-1 text-xs font-semibold text-emerald-900">
+            <div>
+              {t('orders.driverName')}: {order.driver.name}
+            </div>
+            {order.driver.phone ? (
+              <div>
+                {t('orders.driverPhone')}: {order.driver.phone}
+              </div>
+            ) : null}
+            {order.driver.carModel ? (
+              <div>
+                {t('orders.driverCar')}: {order.driver.carModel}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-3 flex items-center justify-between border-t border-brand-line pt-3">
         <div className="text-[10px] font-medium text-brand-muted/70">
           ID: {order.id}

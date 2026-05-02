@@ -85,6 +85,10 @@ export interface Translations {
     statMatched: LanguageLabel
     emptyTitle: LanguageLabel
     emptyHint: LanguageLabel
+    driverFound: LanguageLabel
+    driverName: LanguageLabel
+    driverPhone: LanguageLabel
+    driverCar: LanguageLabel
   }
   profile: {
     language: LanguageLabel

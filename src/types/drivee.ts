@@ -12,6 +12,13 @@ export type RequestStatus = 'submitted' | 'matched' | 'cancelled'
 
 export type PassengerGender = 'any' | 'male' | 'female'
 
+export interface DriverInfo {
+  telegramId?: string
+  name: string
+  phone?: string
+  carModel?: string
+}
+
 export interface RideRequest {
   id: string
   routeId: RouteId
@@ -26,6 +33,7 @@ export interface RideRequest {
   status: RequestStatus
   comment?: string
   createdAtISO: string
+  driver?: DriverInfo
 }
 
 export interface RequestFormData {

@@ -21,6 +21,10 @@ const BOOKINGS_HEADERS = [
   'has_bag',
   'passenger_gender',
   'route_id',
+  'haydovchi_telegram_id',
+  'haydovchi_mashina',
+  'group_chat_id',
+  'group_message_id',
 ]
 const USERS_SHEET_NAME = 'users'
 const USERS_HEADERS = [
@@ -33,8 +37,19 @@ const USERS_HEADERS = [
   'registered_at',
   'last_seen_at',
 ]
+const DRIVERS_SHEET_NAME = 'drivers'
+const DRIVERS_HEADERS = [
+  'telegram_id',
+  'name',
+  'phone',
+  'car_model',
+  'registered_at',
+]
+const BOOKING_STATUS_NEW = 'yangi'
+const BOOKING_STATUS_IN_PROGRESS = 'jarayonda'
 
 let sheetsClient = null
+const bookingLocks = new Map()
 
 async function ensureSheetExists(sheetName) {
   const sheets = await getSheetsClient()
@@ -127,7 +142,7 @@ async function appendBooking(bookingData) {
     telefon: bookingData.passenger_phone || '',
     joylar_soni: bookingData.seats,
     izoh: buildCommentCell(bookingData),
-    holat: 'yangi',
+    holat: BOOKING_STATUS_NEW,
     haydovchi_ismi: '',
     haydovchi_telefon: '',
     narx: '',
@@ -136,6 +151,10 @@ async function appendBooking(bookingData) {
     has_bag: bookingData.has_bag ? 'true' : 'false',
     passenger_gender: bookingData.passenger_gender || 'any',
     route_id: bookingData.route_id || '',
+    haydovchi_telegram_id: '',
+    haydovchi_mashina: '',
+    group_chat_id: '',
+    group_message_id: '',
   }
 
   const row = BOOKINGS_HEADERS.map((header) => rowData[header] ?? '')
@@ -180,6 +199,10 @@ async function ensureSheetHeader(sheetName, headers) {
 }
 
 function normalizeUserField(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeCellValue(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
@@ -286,6 +309,7 @@ function mapStatus(status) {
   }
 
   if (
+    normalized.includes('jarayonda') ||
     normalized.includes('haydovchi topildi') ||
     normalized.includes('matched')
   ) {
@@ -357,6 +381,14 @@ async function listBookingsByTelegramUser(telegramUserId) {
         status: mapStatus(row.holat),
         comment: parseComment(comment) || undefined,
         createdAtISO: row.yaratilgan_vaqt || '',
+        driver: row.haydovchi_ismi
+          ? {
+              telegramId: normalizeCellValue(row.haydovchi_telegram_id) || undefined,
+              name: row.haydovchi_ismi,
+              phone: normalizeCellValue(row.haydovchi_telefon) || undefined,
+              carModel: normalizeCellValue(row.haydovchi_mashina) || undefined,
+            }
+          : undefined,
       }
     })
     .filter(
@@ -372,12 +404,257 @@ async function listBookingsByTelegramUser(telegramUserId) {
 async function ensureHeader() {
   await ensureSheetHeader(BOOKINGS_SHEET_NAME, BOOKINGS_HEADERS)
   await ensureSheetHeader(USERS_SHEET_NAME, USERS_HEADERS)
+  await ensureSheetHeader(DRIVERS_SHEET_NAME, DRIVERS_HEADERS)
+}
+
+function withBookingLock(bookingId, task) {
+  const key = normalizeBookingId(bookingId)
+  const previous = bookingLocks.get(key) || Promise.resolve()
+  const current = previous.catch(() => undefined).then(task)
+  bookingLocks.set(key, current.finally(() => {
+    if (bookingLocks.get(key) === current) {
+      bookingLocks.delete(key)
+    }
+  }))
+  return current
+}
+
+function buildBookingRecord(headers, row, rowNumber) {
+  const rowObject = buildRowObject(headers, row)
+  return {
+    rowNumber,
+    rowObject,
+    bookingId: normalizeBookingId(rowObject.buyurtma_id),
+    status: normalizeCellValue(rowObject.holat).toLowerCase(),
+    passengerTelegramUserId: normalizeCellValue(rowObject.telegram_user_id),
+    passengerName: normalizeCellValue(rowObject.mijoz_ismi),
+    passengerPhone: normalizeCellValue(rowObject.telefon),
+    route: normalizeCellValue(rowObject.yonalish),
+    routeId: normalizeCellValue(rowObject.route_id),
+    date: normalizeCellValue(rowObject.sana),
+    time: normalizeCellValue(rowObject.vaqt),
+    seats: normalizeCellValue(rowObject.joylar_soni),
+    comment: normalizeCellValue(rowObject.izoh),
+    driverName: normalizeCellValue(rowObject.haydovchi_ismi),
+    driverPhone: normalizeCellValue(rowObject.haydovchi_telefon),
+    driverTelegramId: normalizeCellValue(rowObject.haydovchi_telegram_id),
+    driverCarModel: normalizeCellValue(rowObject.haydovchi_mashina),
+    groupChatId: normalizeCellValue(rowObject.group_chat_id),
+    groupMessageId: normalizeCellValue(rowObject.group_message_id),
+    rowValues: BOOKINGS_HEADERS.map((header) => rowObject[header] ?? ''),
+  }
+}
+
+async function getBookingRows() {
+  await ensureSheetExists(BOOKINGS_SHEET_NAME)
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${BOOKINGS_SHEET_NAME}!A:Z`,
+  })
+
+  const rows = res.data.values || []
+  const [headers = [], ...dataRows] = rows
+  return { sheets, spreadsheetId, headers, dataRows }
+}
+
+async function findBookingById(bookingId) {
+  const normalizedId = normalizeBookingId(bookingId)
+  const { sheets, spreadsheetId, headers, dataRows } = await getBookingRows()
+
+  const rowIndex = dataRows.findIndex(
+    (row) => normalizeBookingId(row[0]) === normalizedId,
+  )
+
+  if (rowIndex < 0) {
+    return null
+  }
+
+  const rowNumber = rowIndex + 2
+  return {
+    sheets,
+    spreadsheetId,
+    headers,
+    record: buildBookingRecord(headers, dataRows[rowIndex], rowNumber),
+  }
+}
+
+async function updateBookingRow(rowNumber, rowObject) {
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${BOOKINGS_SHEET_NAME}!A${rowNumber}:V${rowNumber}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [BOOKINGS_HEADERS.map((header) => rowObject[header] ?? '')],
+    },
+  })
+}
+
+async function storeBookingGroupMessage(bookingId, groupMeta) {
+  const booking = await findBookingById(bookingId)
+
+  if (!booking) {
+    return null
+  }
+
+  const nextRow = {
+    ...booking.record.rowObject,
+    group_chat_id: String(groupMeta.chatId),
+    group_message_id: String(groupMeta.messageId),
+  }
+
+  await updateBookingRow(booking.record.rowNumber, nextRow)
+
+  return {
+    ...booking.record,
+    rowObject: nextRow,
+    groupChatId: String(groupMeta.chatId),
+    groupMessageId: String(groupMeta.messageId),
+  }
+}
+
+async function getDriverByTelegramId(telegramId) {
+  await ensureSheetExists(DRIVERS_SHEET_NAME)
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+  const normalizedTelegramId = String(telegramId || '').trim()
+
+  if (!normalizedTelegramId) {
+    return null
+  }
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${DRIVERS_SHEET_NAME}!A:E`,
+  })
+
+  const rows = res.data.values || []
+  const dataRows = rows.slice(1)
+  const existingRow = dataRows.find(
+    (row) => normalizeCellValue(row[0]) === normalizedTelegramId,
+  )
+
+  if (!existingRow) {
+    return null
+  }
+
+  return {
+    telegramId: normalizedTelegramId,
+    name: normalizeCellValue(existingRow[1]),
+    phone: normalizeCellValue(existingRow[2]),
+    carModel: normalizeCellValue(existingRow[3]),
+    registeredAt: normalizeCellValue(existingRow[4]),
+  }
+}
+
+async function registerDriver(driverInput) {
+  await ensureSheetExists(DRIVERS_SHEET_NAME)
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+  const telegramId = String(driverInput.telegramId || '').trim()
+  const now = new Date().toISOString()
+
+  const driverData = {
+    telegram_id: telegramId,
+    name: normalizeCellValue(driverInput.name),
+    phone: normalizeCellValue(driverInput.phone),
+    car_model: normalizeCellValue(driverInput.carModel),
+    registered_at: now,
+  }
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${DRIVERS_SHEET_NAME}!A:E`,
+  })
+
+  const rows = res.data.values || []
+  const dataRows = rows.slice(1)
+  const existingIndex = dataRows.findIndex(
+    (row) => normalizeCellValue(row[0]) === telegramId,
+  )
+
+  if (existingIndex >= 0) {
+    const existingRow = dataRows[existingIndex]
+    driverData.registered_at = normalizeCellValue(existingRow[4]) || now
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${DRIVERS_SHEET_NAME}!A${existingIndex + 2}:E${existingIndex + 2}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [DRIVERS_HEADERS.map((header) => driverData[header] ?? '')],
+      },
+    })
+  } else {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${DRIVERS_SHEET_NAME}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [DRIVERS_HEADERS.map((header) => driverData[header] ?? '')],
+      },
+    })
+  }
+
+  return {
+    telegramId,
+    name: driverData.name,
+    phone: driverData.phone,
+    carModel: driverData.car_model,
+    registeredAt: driverData.registered_at,
+  }
+}
+
+async function claimBooking(bookingId, driver) {
+  return withBookingLock(bookingId, async () => {
+    const booking = await findBookingById(bookingId)
+
+    if (!booking) {
+      return { ok: false, reason: 'not_found' }
+    }
+
+    if (booking.record.status !== BOOKING_STATUS_NEW) {
+      return { ok: false, reason: 'already_taken', booking: booking.record }
+    }
+
+    const nextRow = {
+      ...booking.record.rowObject,
+      holat: BOOKING_STATUS_IN_PROGRESS,
+      haydovchi_ismi: driver.name,
+      haydovchi_telefon: driver.phone,
+      haydovchi_telegram_id: String(driver.telegramId),
+      haydovchi_mashina: driver.carModel,
+    }
+
+    await updateBookingRow(booking.record.rowNumber, nextRow)
+
+    return {
+      ok: true,
+      booking: {
+        ...booking.record,
+        status: BOOKING_STATUS_IN_PROGRESS,
+        rowObject: nextRow,
+        driverName: driver.name,
+        driverPhone: driver.phone,
+        driverTelegramId: String(driver.telegramId),
+        driverCarModel: driver.carModel,
+      },
+    }
+  })
 }
 
 module.exports = {
   appendBooking,
+  claimBooking,
   ensureHeader,
+  getDriverByTelegramId,
   listBookingsByTelegramUser,
+  registerDriver,
+  storeBookingGroupMessage,
   upsertTelegramUser,
   HEADERS: BOOKINGS_HEADERS,
 }

@@ -119,6 +119,10 @@ export const translations: Translations = {
       uz: 'Yangi ariza qoldirsangiz, bu yerda paydo bo\'ladi.',
       ru: 'Posle sozdaniya zayavki ona poyavitsya zdes.',
     },
+    driverFound: { uz: 'Haydovchi topildi', ru: 'Voditel nayden' },
+    driverName: { uz: 'Haydovchi', ru: 'Voditel' },
+    driverPhone: { uz: 'Telefon', ru: 'Telefon' },
+    driverCar: { uz: 'Mashina', ru: 'Mashina' },
   },
   profile: {
     language: { uz: 'Til', ru: 'Yazyk' },
