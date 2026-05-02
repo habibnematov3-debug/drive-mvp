@@ -8,6 +8,7 @@ import OrdersScreen from './screens/OrdersScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import type { Passenger, RequestFormData, RideRequest, TabKey } from './types/drivee'
 import { getApiBaseUrl } from './utils/api'
+import { fetchWithRetry } from './utils/network'
 import { useLanguage } from './contexts/LanguageContext'
 import {
   buildTelegramAuthHeaders,
@@ -90,11 +91,40 @@ export default function App() {
 
     const controller = new AbortController()
 
+    async function warmUpBackend() {
+      const healthResponse = await fetchWithRetry(
+        `${apiBaseUrl}/health`,
+        {
+          method: 'GET',
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        },
+        {
+          retries: 3,
+          timeoutMs: 20_000,
+          initialDelayMs: 1_400,
+        },
+      )
+
+      const contentType = healthResponse.headers.get('content-type') ?? ''
+      if (!healthResponse.ok || !contentType.includes('application/json')) {
+        throw new Error(t('auth.connectionError'))
+      }
+    }
+
     async function loadOrders() {
-      const requestsResponse = await fetch(`${apiBaseUrl}/requests`, {
-        signal: controller.signal,
-        headers: buildTelegramAuthHeaders(telegramUser?.id?.toString()),
-      })
+      const requestsResponse = await fetchWithRetry(
+        `${apiBaseUrl}/requests`,
+        {
+          signal: controller.signal,
+          headers: buildTelegramAuthHeaders(telegramUser?.id?.toString()),
+        },
+        {
+          retries: 2,
+          timeoutMs: 20_000,
+          initialDelayMs: 1_100,
+        },
+      )
       const responseBody = await requestsResponse.text()
       const contentType = requestsResponse.headers.get('content-type') ?? ''
 
@@ -127,12 +157,22 @@ export default function App() {
       setIsOrdersLoading(false)
 
       try {
-        const authResponse = await fetch(`${apiBaseUrl}/auth/telegram`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData }),
-          signal: controller.signal,
-        })
+        await warmUpBackend()
+
+        const authResponse = await fetchWithRetry(
+          `${apiBaseUrl}/auth/telegram`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData }),
+            signal: controller.signal,
+          },
+          {
+            retries: 2,
+            timeoutMs: 20_000,
+            initialDelayMs: 1_100,
+          },
+        )
         const authBody = await authResponse.text()
         const authContentType = authResponse.headers.get('content-type') ?? ''
 

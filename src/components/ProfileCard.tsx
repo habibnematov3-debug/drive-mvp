@@ -81,9 +81,15 @@ export default function ProfileCard({
         </div>
 
         <a
-          href="https://t.me/gmkhn"
-          target="_blank"
-          rel="noopener noreferrer"
+          role="button"
+          tabIndex={0}
+          onClick={onSupport}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onSupport()
+            }
+          }}
           className="group block w-full rounded-[28px] border border-brand-line bg-white p-4 text-left shadow-soft transition-all hover:border-brand-blue/50 active:scale-[0.98]"
         >
           <div className="flex items-center justify-between">
@@ -95,9 +101,7 @@ export default function ProfileCard({
                 <div className="text-sm font-black text-brand-ink">
                   {t('profile.contactSupport') || 'Contact Support'}
                 </div>
-                <div className="text-xs font-bold text-brand-muted">
-                  @gmkhn
-                </div>
+                <div className="text-xs font-bold text-brand-muted">@gmkhn</div>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 text-brand-muted group-hover:text-brand-blue" />
