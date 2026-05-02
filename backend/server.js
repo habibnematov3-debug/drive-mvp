@@ -5,13 +5,18 @@ const { getBot, startBot } = require('./src/bot')
 
 const PORT = process.env.PORT || 3000
 
-async function start() {
+function start() {
   try {
-    await app.getStartupPromise()
-    await startBot()
-
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server started on port ${PORT}`)
+    })
+
+    app.getStartupPromise().catch((error) => {
+      console.error('[Startup] Background initialization failed:', error.message)
+    })
+
+    startBot().catch((error) => {
+      console.error('[Bot] Launch failed:', error.message)
     })
   } catch (error) {
     console.error('[Startup] Fatal error:', error.message)
