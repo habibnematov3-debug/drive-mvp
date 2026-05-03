@@ -308,6 +308,30 @@ async function upsertTelegramUser(user) {
   })
 }
 
+async function getAllUsers() {
+  await ensureSheetExists(USERS_SHEET_NAME)
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${USERS_SHEET_NAME}!A:H`,
+  })
+
+  const rows = res.data.values || []
+  const dataRows = rows.slice(1)
+  const uniqueTelegramUserIds = new Set()
+
+  for (const row of dataRows) {
+    const telegramUserId = normalizeCellValue(row[0])
+
+    if (telegramUserId) {
+      uniqueTelegramUserIds.add(telegramUserId)
+    }
+  }
+
+  return Array.from(uniqueTelegramUserIds)
+}
+
 function parseBoolean(value) {
   if (typeof value !== 'string') return false
   return ['true', '1', 'yes', 'ha'].includes(value.trim().toLowerCase())
@@ -822,6 +846,7 @@ module.exports = {
   claimBooking,
   confirmPendingBooking,
   ensureHeader,
+  getAllUsers,
   getDriverByTelegramId,
   listBookingsByTelegramUser,
   registerDriver,

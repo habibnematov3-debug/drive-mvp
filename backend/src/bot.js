@@ -2,6 +2,7 @@ const { Markup, Telegraf } = require('telegraf')
 const {
   claimBooking,
   confirmPendingBooking,
+  getAllUsers,
   getDriverByTelegramId,
   registerDriver,
   resetPendingBooking,
@@ -15,6 +16,8 @@ const driverRegistrationSessions = new Map()
 const pendingPassengerConfirmations = new Map()
 const PHONE_REGEX = /^\+998\d{9}$/
 const PASSENGER_CONFIRMATION_TIMEOUT_MS = 5 * 60 * 1000
+const BROADCAST_DELAY_MS = 50
+const ADMIN_TELEGRAM_ID = '8581686582'
 
 function getBot() {
   if (!bot) {
@@ -185,6 +188,10 @@ function parseRegisterStepMessage(step) {
   return 'Mashina rusumi va modelini yuboring.\nMasalan: Cobalt 4.'
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function handleDriverRegistrationText(ctx, session) {
   const text = String(ctx.message?.text || '').trim()
 
@@ -335,6 +342,40 @@ function attachBotHandlers(botInstance) {
     })
 
     await ctx.reply(parseRegisterStepMessage('name'))
+  })
+
+  botInstance.command('broadcast', async (ctx) => {
+    const telegramId = String(ctx.from?.id || '')
+
+    if (telegramId !== ADMIN_TELEGRAM_ID) {
+      await ctx.reply('Bu buyruq faqat admin uchun.')
+      return
+    }
+
+    const text = String(ctx.message?.text || '')
+    const broadcastMessage = text.replace(/^\/broadcast(?:@\S+)?\s*/i, '').trim()
+
+    if (!broadcastMessage) {
+      await ctx.reply("Xabar matnini kiriting. Masalan: /broadcast Assalomu alaykum")
+      return
+    }
+
+    const userIds = await getAllUsers()
+    let sentCount = 0
+    let errorCount = 0
+
+    for (const userId of userIds) {
+      try {
+        await ctx.telegram.sendMessage(userId, broadcastMessage)
+        sentCount += 1
+      } catch {
+        errorCount += 1
+      }
+
+      await sleep(BROADCAST_DELAY_MS)
+    }
+
+    await ctx.reply(`✅ Yuborildi: ${sentCount} ta, ❌ Xato: ${errorCount} ta`)
   })
 
   botInstance.on('text', async (ctx, next) => {
