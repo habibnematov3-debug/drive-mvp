@@ -192,6 +192,42 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function getBroadcastText(rawText) {
+  return String(rawText || '')
+    .replace(/^\/broadcast(?:@\S+)?\s*/i, '')
+    .trim()
+}
+
+function isAdmin(telegramId) {
+  return String(telegramId || '') === ADMIN_TELEGRAM_ID
+}
+
+async function runBroadcast(ctx, payload) {
+  const userIds = await getAllUsers()
+  let sentCount = 0
+  let errorCount = 0
+
+  for (const userId of userIds) {
+    try {
+      if (payload.photoFileId) {
+        await ctx.telegram.sendPhoto(userId, payload.photoFileId, {
+          caption: payload.text,
+        })
+      } else {
+        await ctx.telegram.sendMessage(userId, payload.text)
+      }
+
+      sentCount += 1
+    } catch {
+      errorCount += 1
+    }
+
+    await sleep(BROADCAST_DELAY_MS)
+  }
+
+  await ctx.reply(`✅ Yuborildi: ${sentCount} ta, ❌ Xato: ${errorCount} ta`)
+}
+
 async function handleDriverRegistrationText(ctx, session) {
   const text = String(ctx.message?.text || '').trim()
 
@@ -347,35 +383,48 @@ function attachBotHandlers(botInstance) {
   botInstance.command('broadcast', async (ctx) => {
     const telegramId = String(ctx.from?.id || '')
 
-    if (telegramId !== ADMIN_TELEGRAM_ID) {
+    if (!isAdmin(telegramId)) {
       await ctx.reply('Bu buyruq faqat admin uchun.')
       return
     }
 
-    const text = String(ctx.message?.text || '')
-    const broadcastMessage = text.replace(/^\/broadcast(?:@\S+)?\s*/i, '').trim()
+    const broadcastMessage = getBroadcastText(ctx.message?.text)
 
     if (!broadcastMessage) {
       await ctx.reply("Xabar matnini kiriting. Masalan: /broadcast Assalomu alaykum")
       return
     }
 
-    const userIds = await getAllUsers()
-    let sentCount = 0
-    let errorCount = 0
+    await runBroadcast(ctx, { text: broadcastMessage })
+  })
 
-    for (const userId of userIds) {
-      try {
-        await ctx.telegram.sendMessage(userId, broadcastMessage)
-        sentCount += 1
-      } catch {
-        errorCount += 1
-      }
+  botInstance.on('photo', async (ctx, next) => {
+    const caption = String(ctx.message?.caption || '')
 
-      await sleep(BROADCAST_DELAY_MS)
+    if (!caption.trim().startsWith('/broadcast')) {
+      return next()
     }
 
-    await ctx.reply(`✅ Yuborildi: ${sentCount} ta, ❌ Xato: ${errorCount} ta`)
+    const telegramId = String(ctx.from?.id || '')
+
+    if (!isAdmin(telegramId)) {
+      await ctx.reply('Bu buyruq faqat admin uchun.')
+      return
+    }
+
+    const broadcastMessage = getBroadcastText(caption)
+    const photoList = Array.isArray(ctx.message?.photo) ? ctx.message.photo : []
+    const photoFileId = photoList[photoList.length - 1]?.file_id
+
+    if (!broadcastMessage || !photoFileId) {
+      await ctx.reply("Rasm bilan yuborish uchun caption yozing. Masalan: /broadcast Assalomu alaykum")
+      return
+    }
+
+    await runBroadcast(ctx, {
+      text: broadcastMessage,
+      photoFileId,
+    })
   })
 
   botInstance.on('text', async (ctx, next) => {
