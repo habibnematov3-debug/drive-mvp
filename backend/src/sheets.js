@@ -194,7 +194,7 @@ async function appendBooking(bookingData) {
     sana: bookingData.date,
     vaqt: bookingData.time,
     mijoz_ismi: bookingData.passenger_name || '',
-    telefon: bookingData.passenger_phone || '',
+    telefon: formatPhone(bookingData.passenger_phone),
     joylar_soni: bookingData.seats,
     izoh: buildCommentCell(bookingData),
     holat: BOOKING_STATUS_NEW,
@@ -259,6 +259,12 @@ function normalizeUserField(value) {
 
 function normalizeCellValue(value) {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function formatPhone(phone) {
+  if (!phone) return ''
+  const cleaned = phone.toString().trim()
+  return cleaned.startsWith('+') ? cleaned : `+${cleaned}`
 }
 
 async function upsertTelegramUser(user) {
@@ -567,7 +573,7 @@ async function listBookingsByTelegramUser(telegramUserId) {
         routeLabel,
         dateISO: row.sana || '',
         time: row.vaqt || '',
-        passengerPhone: row.telefon || undefined,
+        passengerPhone: formatPhone(row.telefon) || undefined,
         passengerCount: Number(row.joylar_soni || 1),
         fullCar: parseFullCar(row.full_car, comment),
         hasBag: parseBoolean(row.has_bag),
@@ -579,7 +585,7 @@ async function listBookingsByTelegramUser(telegramUserId) {
           ? {
               telegramId: normalizeCellValue(row.haydovchi_telegram_id) || undefined,
               name: row.haydovchi_ismi,
-              phone: normalizeCellValue(row.haydovchi_telefon) || undefined,
+              phone: formatPhone(row.haydovchi_telefon) || undefined,
               carModel: normalizeCellValue(row.haydovchi_mashina) || undefined,
             }
           : undefined,
@@ -626,7 +632,7 @@ function buildBookingRecord(headers, row, rowNumber) {
     status: normalizeCellValue(rowObject.holat).toLowerCase(),
     passengerTelegramUserId: normalizeCellValue(rowObject.telegram_user_id),
     passengerName: normalizeCellValue(rowObject.mijoz_ismi),
-    passengerPhone: normalizeCellValue(rowObject.telefon),
+    passengerPhone: formatPhone(rowObject.telefon),
     route: normalizeCellValue(rowObject.yonalish),
     routeId: normalizeCellValue(rowObject.route_id),
     date: normalizeCellValue(rowObject.sana),
@@ -634,7 +640,7 @@ function buildBookingRecord(headers, row, rowNumber) {
     seats: normalizeCellValue(rowObject.joylar_soni),
     comment: normalizeCellValue(rowObject.izoh),
     driverName: normalizeCellValue(rowObject.haydovchi_ismi),
-    driverPhone: normalizeCellValue(rowObject.haydovchi_telefon),
+    driverPhone: formatPhone(rowObject.haydovchi_telefon),
     driverTelegramId: normalizeCellValue(rowObject.haydovchi_telegram_id),
     driverCarModel: normalizeCellValue(rowObject.haydovchi_mashina),
     groupChatId: normalizeCellValue(rowObject.group_chat_id),
@@ -698,7 +704,7 @@ function attachDriverToRow(rowObject, driver) {
   return {
     ...rowObject,
     haydovchi_ismi: driver.name,
-    haydovchi_telefon: driver.phone,
+    haydovchi_telefon: formatPhone(driver.phone),
     haydovchi_telegram_id: String(driver.telegramId),
     haydovchi_mashina: driver.carModel,
   }
@@ -765,7 +771,7 @@ async function getDriverByTelegramId(telegramId) {
   return {
     telegramId: normalizedTelegramId,
     name: normalizeCellValue(existingRow[1]),
-    phone: normalizeCellValue(existingRow[2]),
+    phone: formatPhone(existingRow[2]),
     carModel: normalizeCellValue(existingRow[3]),
     registeredAt: normalizeCellValue(existingRow[4]),
   }
@@ -781,7 +787,7 @@ async function registerDriver(driverInput) {
   const driverData = {
     telegram_id: telegramId,
     name: normalizeCellValue(driverInput.name),
-    phone: normalizeCellValue(driverInput.phone),
+    phone: formatPhone(driverInput.phone),
     car_model: normalizeCellValue(driverInput.carModel),
     registered_at: now,
   }

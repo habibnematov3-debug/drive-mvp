@@ -51,6 +51,12 @@ function formatGenderLabel(passengerGender) {
   return "Farqi yo'q"
 }
 
+function formatPhone(phone) {
+  if (!phone) return ''
+  const cleaned = phone.toString().trim()
+  return cleaned.startsWith('+') ? cleaned : `+${cleaned}`
+}
+
 function buildGroupMessage(bookingId, data, options = {}) {
   const statusLabel = options.statusLabel || 'yangi'
   const lines = [
@@ -72,7 +78,7 @@ function buildGroupMessage(bookingId, data, options = {}) {
   }
 
   if (data.passenger_phone) {
-    lines.push(`Telefon: ${data.passenger_phone}`)
+    lines.push(`Telefon: ${formatPhone(data.passenger_phone)}`)
   }
 
   lines.push(`Izoh: ${data.comment || '-'}`)
@@ -80,7 +86,7 @@ function buildGroupMessage(bookingId, data, options = {}) {
 
   if (options.driver) {
     lines.push(`Haydovchi: ${options.driver.name}`)
-    lines.push(`Telefon: ${options.driver.phone}`)
+    lines.push(`Telefon: ${formatPhone(options.driver.phone)}`)
 
     if (options.driver.carModel) {
       lines.push(`Mashina: ${options.driver.carModel}`)
@@ -147,7 +153,7 @@ function buildBookingPayloadFromRecord(booking) {
     full_car: booking.rowObject.full_car === 'true',
     passenger_gender: booking.rowObject.passenger_gender,
     passenger_name: booking.passengerName,
-    passenger_phone: booking.passengerPhone,
+    passenger_phone: formatPhone(booking.passengerPhone),
     comment: booking.comment,
   }
 }
@@ -184,7 +190,7 @@ function buildPassengerFoundMessage(driver, ratingInfo) {
   const lines = [
     '✅ Haydovchi topildi!',
     `Haydovchi: ${driver.name}`,
-    `Tel: ${driver.phone}`,
+    `Tel: ${formatPhone(driver.phone)}`,
   ]
 
   if (driver.carModel) {
@@ -202,7 +208,7 @@ function buildDriverPassengerMessage(booking) {
   return [
     "✅ Yo'lovchi ma'lumoti:",
     `Ism: ${booking.passengerName || '-'}`,
-    `Tel: ${booking.passengerPhone || '-'}`,
+    `Tel: ${formatPhone(booking.passengerPhone) || '-'}`,
     `Yo'nalish: ${booking.route || '-'}`,
     `Vaqt: ${booking.time || '-'}`,
   ].join('\n')
@@ -341,7 +347,7 @@ async function handleDriverRegistrationText(ctx, session) {
     [
       "✅ Ro'yxatdan o'tdingiz.",
       `Ism: ${driver.name}`,
-      `Tel: ${driver.phone}`,
+      `Tel: ${formatPhone(driver.phone)}`,
       `Mashina: ${driver.carModel}`,
       "Endi guruhdagi '✅ Olish' tugmasi orqali arizalarni olishingiz mumkin.",
     ].join('\n'),
@@ -663,7 +669,7 @@ function attachBotHandlers(botInstance) {
       [
         '✅ Haydovchi tasdiqlandi!',
         `Haydovchi: ${booking.driverName}`,
-        `Tel: ${booking.driverPhone}`,
+        `Tel: ${formatPhone(booking.driverPhone)}`,
         booking.driverCarModel ? `Mashina: ${booking.driverCarModel}` : null,
       ]
         .filter(Boolean)
