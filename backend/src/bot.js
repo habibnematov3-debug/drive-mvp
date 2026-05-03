@@ -11,6 +11,7 @@ const {
   resetPendingBooking,
   saveRating,
   storeBookingGroupMessage,
+  upsertTelegramUser,
 } = require('./sheets')
 
 let bot = null
@@ -215,6 +216,23 @@ function buildRatingRequestMessage() {
   return "Sayohatingiz qanday o'tdi? Haydovchini baholang 👇"
 }
 
+function buildStartMessage() {
+  return [
+    '🚗 Haydovchi qidirib charchadingizmi?',
+    '',
+    "Telegram gruppalarda soatlab kutish,",
+    "ko'p qo'ng'iroqlar va noaniq narxlar bezdirdimi?",
+    '',
+    'Drivee ilovasiga kiring va 1 daqiqada mashina toping. 👇',
+  ].join('\n')
+}
+
+function buildStartKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.webApp('🚀 Ilovaga kirish', process.env.WEBAPP_URL)],
+  ])
+}
+
 function parseRegisterStepMessage(step) {
   if (step === 'name') {
     return "Haydovchi ro'yxatdan o'tishi boshlandi.\n\nIltimos, ism va familiyangizni yuboring."
@@ -408,6 +426,14 @@ function attachBotHandlers(botInstance) {
   }
 
   botHandlersAttached = true
+
+  botInstance.command('start', async (ctx) => {
+    if (ctx.from) {
+      await upsertTelegramUser(ctx.from)
+    }
+
+    await ctx.reply(buildStartMessage(), buildStartKeyboard())
+  })
 
   botInstance.command('register', async (ctx) => {
     const telegramId = String(ctx.from?.id || '')
