@@ -45,9 +45,18 @@ const DRIVERS_HEADERS = [
   'car_model',
   'registered_at',
 ]
+const RATINGS_SHEET_NAME = 'Ratings'
+const RATINGS_HEADERS = [
+  'booking_id',
+  'driver_telegram_id',
+  'passenger_telegram_id',
+  'rating',
+  'created_at',
+]
 const BOOKING_STATUS_NEW = 'yangi'
 const BOOKING_STATUS_PENDING = 'kutilmoqda'
 const BOOKING_STATUS_IN_PROGRESS = 'jarayonda'
+const BOOKING_STATUS_COMPLETED = 'tugallandi'
 
 const ROUTE_LABELS_BY_ID = {
   'kokand-tashkent': 'Kokand -> Tashkent',
@@ -332,6 +341,103 @@ async function getAllUsers() {
   return Array.from(uniqueTelegramUserIds)
 }
 
+async function getRatingsRows() {
+  await ensureSheetExists(RATINGS_SHEET_NAME)
+  const sheets = await getSheetsClient()
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${RATINGS_SHEET_NAME}!A:E`,
+  })
+
+  const rows = res.data.values || []
+  return {
+    sheets,
+    spreadsheetId,
+    rows,
+    dataRows: rows.slice(1),
+  }
+}
+
+async function saveRating(bookingId, driverTelegramId, passengerTelegramUserId, rating) {
+  const normalizedBookingId = normalizeBookingId(bookingId)
+  const normalizedDriverTelegramId = normalizeCellValue(driverTelegramId)
+  const normalizedPassengerTelegramUserId = normalizeCellValue(passengerTelegramUserId)
+  const normalizedRating = Number(rating)
+
+  if (!normalizedBookingId || !normalizedDriverTelegramId || !normalizedPassengerTelegramUserId) {
+    return { ok: false, reason: 'invalid_input' }
+  }
+
+  if (!Number.isInteger(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) {
+    return { ok: false, reason: 'invalid_rating' }
+  }
+
+  const { sheets, spreadsheetId, dataRows } = await getRatingsRows()
+  const createdAt = new Date().toISOString()
+  const rowData = {
+    booking_id: normalizedBookingId,
+    driver_telegram_id: normalizedDriverTelegramId,
+    passenger_telegram_id: normalizedPassengerTelegramUserId,
+    rating: String(normalizedRating),
+    created_at: createdAt,
+  }
+  const existingIndex = dataRows.findIndex(
+    (row) => normalizeBookingId(row[0]) === normalizedBookingId,
+  )
+
+  if (existingIndex >= 0) {
+    return {
+      ok: false,
+      reason: 'already_rated',
+      rating: normalizedRating,
+    }
+  }
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `${RATINGS_SHEET_NAME}!A1`,
+    valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: {
+      values: [RATINGS_HEADERS.map((header) => rowData[header] ?? '')],
+    },
+  })
+
+  return {
+    ok: true,
+    rating: normalizedRating,
+    createdAt,
+  }
+}
+
+async function getDriverRating(driverTelegramId) {
+  const normalizedDriverTelegramId = normalizeCellValue(driverTelegramId)
+
+  if (!normalizedDriverTelegramId) {
+    return null
+  }
+
+  const { dataRows } = await getRatingsRows()
+  const driverRatings = dataRows
+    .filter((row) => normalizeCellValue(row[1]) === normalizedDriverTelegramId)
+    .map((row) => Number(row[3]))
+    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 5)
+
+  if (!driverRatings.length) {
+    return null
+  }
+
+  const totalCount = driverRatings.length
+  const averageRating =
+    driverRatings.reduce((sum, value) => sum + value, 0) / totalCount
+
+  return {
+    averageRating,
+    totalCount,
+  }
+}
+
 function parseBoolean(value) {
   if (typeof value !== 'string') return false
   return ['true', '1', 'yes', 'ha'].includes(value.trim().toLowerCase())
@@ -369,6 +475,10 @@ function parseComment(comment) {
 
 function mapStatus(status) {
   const normalized = typeof status === 'string' ? status.trim().toLowerCase() : ''
+
+  if (normalized.includes('tugallandi') || normalized === 'completed') {
+    return 'completed'
+  }
 
   if (
     normalized.includes('bekor') ||
@@ -489,6 +599,7 @@ async function ensureHeader() {
   await ensureSheetHeader(BOOKINGS_SHEET_NAME, BOOKINGS_HEADERS)
   await ensureSheetHeader(USERS_SHEET_NAME, USERS_HEADERS)
   await ensureSheetHeader(DRIVERS_SHEET_NAME, DRIVERS_HEADERS)
+  await ensureSheetHeader(RATINGS_SHEET_NAME, RATINGS_HEADERS)
 }
 
 function withBookingLock(bookingId, task) {
@@ -563,6 +674,11 @@ async function findBookingById(bookingId) {
     headers,
     record: buildBookingRecord(headers, dataRows[rowIndex], rowNumber),
   }
+}
+
+async function getBookingById(bookingId) {
+  const booking = await findBookingById(bookingId)
+  return booking?.record || null
 }
 
 async function updateBookingRow(rowNumber, rowObject) {
@@ -792,6 +908,47 @@ async function confirmPendingBooking(bookingId, passengerTelegramUserId) {
   })
 }
 
+async function completeBooking(bookingId, driverTelegramId) {
+  return withBookingLock(bookingId, async () => {
+    const booking = await findBookingById(bookingId)
+
+    if (!booking) {
+      return { ok: false, reason: 'not_found' }
+    }
+
+    if (
+      driverTelegramId &&
+      booking.record.driverTelegramId !== String(driverTelegramId)
+    ) {
+      return { ok: false, reason: 'forbidden', booking: booking.record }
+    }
+
+    if (booking.record.status === BOOKING_STATUS_COMPLETED) {
+      return { ok: false, reason: 'already_completed', booking: booking.record }
+    }
+
+    if (booking.record.status !== BOOKING_STATUS_IN_PROGRESS) {
+      return { ok: false, reason: 'not_in_progress', booking: booking.record }
+    }
+
+    const nextRow = {
+      ...booking.record.rowObject,
+      holat: BOOKING_STATUS_COMPLETED,
+    }
+
+    await updateBookingRow(booking.record.rowNumber, nextRow)
+
+    return {
+      ok: true,
+      booking: {
+        ...booking.record,
+        status: BOOKING_STATUS_COMPLETED,
+        rowObject: nextRow,
+      },
+    }
+  })
+}
+
 async function resetPendingBooking(bookingId, options = {}) {
   return withBookingLock(bookingId, async () => {
     const booking = await findBookingById(bookingId)
@@ -844,13 +1001,17 @@ async function resetPendingBooking(bookingId, options = {}) {
 module.exports = {
   appendBooking,
   claimBooking,
+  completeBooking,
   confirmPendingBooking,
   ensureHeader,
   getAllUsers,
+  getBookingById,
   getDriverByTelegramId,
+  getDriverRating,
   listBookingsByTelegramUser,
   registerDriver,
   resetPendingBooking,
+  saveRating,
   storeBookingGroupMessage,
   upsertTelegramUser,
   HEADERS: BOOKINGS_HEADERS,

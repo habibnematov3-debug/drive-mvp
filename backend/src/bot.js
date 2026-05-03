@@ -1,11 +1,15 @@
 const { Markup, Telegraf } = require('telegraf')
 const {
   claimBooking,
+  completeBooking,
   confirmPendingBooking,
   getAllUsers,
+  getBookingById,
   getDriverByTelegramId,
+  getDriverRating,
   registerDriver,
   resetPendingBooking,
+  saveRating,
   storeBookingGroupMessage,
 } = require('./sheets')
 
@@ -115,6 +119,24 @@ function buildPassengerDecisionKeyboard(bookingId) {
   ])
 }
 
+function buildTripCompletionKeyboard(bookingId) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback('✅ Sayohat tugadi', `driver_complete:${bookingId}`)],
+  ])
+}
+
+function buildRatingKeyboard(bookingId) {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('⭐️1', `rate_trip:${bookingId}:1`),
+      Markup.button.callback('⭐️2', `rate_trip:${bookingId}:2`),
+      Markup.button.callback('⭐️3', `rate_trip:${bookingId}:3`),
+      Markup.button.callback('⭐️4', `rate_trip:${bookingId}:4`),
+      Markup.button.callback('⭐️5', `rate_trip:${bookingId}:5`),
+    ],
+  ])
+}
+
 function buildBookingPayloadFromRecord(booking) {
   return {
     route: booking.route,
@@ -149,7 +171,15 @@ async function confirmToUser(telegramUserId, bookingId, bookingData) {
   await getBot().telegram.sendMessage(telegramUserId, text)
 }
 
-function buildPassengerFoundMessage(driver) {
+function formatDriverRatingLabel(ratingInfo) {
+  if (!ratingInfo?.totalCount) {
+    return '⭐️ Reyting: yangi haydovchi'
+  }
+
+  return `⭐️ Reyting: ${ratingInfo.averageRating.toFixed(1)} (${ratingInfo.totalCount} ta baho)`
+}
+
+function buildPassengerFoundMessage(driver, ratingInfo) {
   const lines = [
     '✅ Haydovchi topildi!',
     `Haydovchi: ${driver.name}`,
@@ -160,6 +190,7 @@ function buildPassengerFoundMessage(driver) {
     lines.push(`Mashina: ${driver.carModel}`)
   }
 
+  lines.push(formatDriverRatingLabel(ratingInfo))
   lines.push('')
   lines.push("Agar haydovchi sizga mos bo'lsa, tasdiqlang.")
 
@@ -174,6 +205,14 @@ function buildDriverPassengerMessage(booking) {
     `Yo'nalish: ${booking.route || '-'}`,
     `Vaqt: ${booking.time || '-'}`,
   ].join('\n')
+}
+
+function buildTripCompletionRequestMessage() {
+  return 'Sayohat tugadimi? Tasdiqlang 👇'
+}
+
+function buildRatingRequestMessage() {
+  return "Sayohatingiz qanday o'tdi? Haydovchini baholang 👇"
 }
 
 function parseRegisterStepMessage(step) {
@@ -508,10 +547,18 @@ function attachBotHandlers(botInstance) {
       return
     }
 
+    let driverRating = null
+
+    try {
+      driverRating = await getDriverRating(driver.telegramId)
+    } catch (error) {
+      console.error('[Bot] Failed to load driver rating:', error.message)
+    }
+
     try {
       await ctx.telegram.sendMessage(
         booking.passengerTelegramUserId,
-        buildPassengerFoundMessage(driver),
+        buildPassengerFoundMessage(driver, driverRating),
         buildPassengerDecisionKeyboard(booking.bookingId),
       )
     } catch (error) {
@@ -601,12 +648,149 @@ function attachBotHandlers(botInstance) {
           pending.driverTelegramId,
           buildDriverPassengerMessage(booking),
         )
+        await ctx.telegram.sendMessage(
+          pending.driverTelegramId,
+          buildTripCompletionRequestMessage(),
+          buildTripCompletionKeyboard(bookingId),
+        )
       } catch (error) {
         console.error('[Bot] Failed to notify driver after confirmation:', error.message)
       }
     }
 
     await ctx.answerCbQuery('Tasdiqlandi.')
+  })
+
+  botInstance.action(/^driver_complete:(.+)$/, async (ctx) => {
+    const bookingId = String(ctx.match?.[1] || '').trim()
+    const telegramId = String(ctx.from?.id || '')
+
+    if (!bookingId || !telegramId) {
+      await ctx.answerCbQuery("Arizani aniqlab bo'lmadi.")
+      return
+    }
+
+    const completeResult = await completeBooking(bookingId, telegramId)
+
+    if (!completeResult.ok) {
+      if (completeResult.reason === 'already_completed') {
+        await ctx.answerCbQuery()
+        return
+      }
+
+      const message =
+        completeResult.reason === 'forbidden'
+          ? "Bu tugma siz uchun emas."
+          : completeResult.reason === 'not_in_progress'
+            ? "Bu sayohatni hozir tugatib bo'lmaydi."
+            : 'Ariza topilmadi.'
+
+      await ctx.answerCbQuery(message, {
+        show_alert: completeResult.reason === 'forbidden',
+      })
+      return
+    }
+
+    const booking = completeResult.booking
+
+    try {
+      await editGroupMessageForStatus(bookingId, booking, {
+        statusLabel: 'tugallandi',
+        driver: {
+          name: booking.driverName,
+          phone: booking.driverPhone,
+          carModel: booking.driverCarModel,
+        },
+      })
+    } catch (error) {
+      console.error('[Bot] Failed to mark group message as completed:', error.message)
+    }
+
+    try {
+      await ctx.editMessageText("✅ Sayohat tugagani tasdiqlandi.")
+    } catch (error) {
+      console.error('[Bot] Failed to update driver completion message:', error.message)
+    }
+
+    if (booking.passengerTelegramUserId) {
+      try {
+        await ctx.telegram.sendMessage(
+          booking.passengerTelegramUserId,
+          buildRatingRequestMessage(),
+          buildRatingKeyboard(bookingId),
+        )
+      } catch (error) {
+        console.error('[Bot] Failed to send rating request:', error.message)
+      }
+    }
+
+    await ctx.answerCbQuery('Tasdiqlandi.')
+  })
+
+  botInstance.action(/^rate_trip:(.+):([1-5])$/, async (ctx) => {
+    const bookingId = String(ctx.match?.[1] || '').trim()
+    const rating = Number(ctx.match?.[2] || 0)
+    const telegramId = String(ctx.from?.id || '')
+
+    if (!bookingId || !telegramId || !Number.isInteger(rating)) {
+      await ctx.answerCbQuery("Arizani aniqlab bo'lmadi.")
+      return
+    }
+
+    const booking = await getBookingById(bookingId)
+
+    if (!booking) {
+      await ctx.answerCbQuery('Ariza topilmadi.')
+      return
+    }
+
+    if (booking.passengerTelegramUserId !== telegramId) {
+      await ctx.answerCbQuery("Bu tugma siz uchun emas.", {
+        show_alert: true,
+      })
+      return
+    }
+
+    if (booking.status !== 'tugallandi') {
+      await ctx.answerCbQuery("Bu sayohat hali tugallanmagan.")
+      return
+    }
+
+    const saveResult = await saveRating(
+      bookingId,
+      booking.driverTelegramId,
+      booking.passengerTelegramUserId,
+      rating,
+    )
+
+    if (!saveResult.ok) {
+      if (saveResult.reason === 'already_rated') {
+        await ctx.answerCbQuery()
+        return
+      }
+
+      await ctx.answerCbQuery("Bahoni saqlab bo'lmadi.")
+      return
+    }
+
+    try {
+      await ctx.editMessageText('Rahmat! Bahoyingiz qabul qilindi ✅')
+    } catch (error) {
+      console.error('[Bot] Failed to update rating message:', error.message)
+    }
+
+    if (booking.driverTelegramId) {
+      try {
+        await ctx.telegram.sendMessage(
+          booking.driverTelegramId,
+          `Yo'lovchi sizga ${rating} yulduz berdi ⭐️`,
+        )
+      } catch (error) {
+        console.error('[Bot] Failed to notify driver about rating:', error.message)
+      }
+    }
+
+    await ctx.answerCbQuery('Rahmat!')
   })
 
   botInstance.action(/^passenger_reject:(.+)$/, async (ctx) => {
