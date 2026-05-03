@@ -228,8 +228,14 @@ function buildStartMessage() {
 }
 
 function buildStartKeyboard() {
+  const webAppUrl = String(process.env.WEBAPP_URL || '').trim()
+
+  if (!webAppUrl) {
+    return undefined
+  }
+
   return Markup.inlineKeyboard([
-    [Markup.button.webApp('🚀 Ilovaga kirish', process.env.WEBAPP_URL)],
+    [Markup.button.webApp('🚀 Ilovaga kirish', webAppUrl)],
   ])
 }
 
