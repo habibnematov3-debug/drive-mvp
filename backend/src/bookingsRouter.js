@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 const express = require('express')
 const {
   confirmToUser,
@@ -16,17 +17,31 @@ const router = express.Router()
 
 router.get('/', requireTelegramUser, async (req, res) => {
   try {
-    const requests = await listBookingsByTelegramUser(String(req.telegramUser.id))
-
-    return res.json({
+    const telegramUserId = String(req.telegramUser.id)
+    const requests = await listBookingsByTelegramUser(telegramUserId)
+    const payload = {
       success: true,
       requests,
-    })
+    }
+    const etag = `"${crypto
+      .createHash('sha1')
+      .update(JSON.stringify(payload))
+      .digest('hex')}"`
+
+    res.set('Cache-Control', 'private, no-cache, max-age=0')
+    res.set('Vary', 'X-Telegram-Init-Data, X-Drivee-Dev-User-Id')
+    res.set('ETag', etag)
+
+    if (req.get('if-none-match') === etag) {
+      return res.status(304).end()
+    }
+
+    return res.json(payload)
   } catch (error) {
     console.error('[Booking] Error fetching bookings:', error.message)
     return res.status(500).json({
       success: false,
-      error: 'Internal server error. Please try again.',
+      error: "Arizalarni yuklab bo'lmadi. Qayta urinib ko'ring.",
     })
   }
 })

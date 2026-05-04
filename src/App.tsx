@@ -291,21 +291,6 @@ export default function App() {
     return () => window.clearTimeout(timeoutId)
   }, [toast])
 
-  useEffect(() => {
-    if (authState !== 'ready' || !passenger?.telegramUserId) {
-      return
-    }
-
-    const intervalId = window.setInterval(() => {
-      void refreshOrders({
-        silent: true,
-        telegramUserId: passenger.telegramUserId,
-      })
-    }, 30_000)
-
-    return () => window.clearInterval(intervalId)
-  }, [authState, passenger?.telegramUserId, refreshOrders])
-
   function addOrder(request: RequestFormData, bookingId: string) {
     const nextOrder: RideRequest = {
       id: bookingId,
