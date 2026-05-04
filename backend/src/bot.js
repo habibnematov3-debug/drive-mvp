@@ -60,37 +60,22 @@ function formatPhone(phone) {
 function buildGroupMessage(bookingId, data, options = {}) {
   const statusLabel = options.statusLabel || 'yangi'
   const lines = [
-    `Yangi ariza #${bookingId}`,
+    `🆕 Yangi ariza #${bookingId}`,
     '',
-    `Yo'nalish: ${data.route}`,
-    `Sana: ${formatDate(data.date)}`,
-    `Vaqt: ${data.time}`,
-    `Joylar soni: ${data.seats}`,
-    `To'liq mashina: ${data.full_car ? 'ha' : "yo'q"}`,
+    `📍 Yo'nalish: ${data.route}`,
+    `📅 Sana: ${formatDate(data.date)}`,
+    `🕐 Vaqt: ${data.time}`,
+    `👥 Joylar: ${data.seats}`,
+    `👤 Mijoz: ${data.passenger_name || '-'}`,
+    `💬 Izoh: ${data.comment || '-'}`,
   ]
 
-  if (data.passenger_gender && data.passenger_gender !== 'any') {
-    lines.push(`Mijoz jinsi: ${formatGenderLabel(data.passenger_gender)}`)
+  if (statusLabel !== 'yangi') {
+    lines.push(`📌 Holat: ${statusLabel}`)
   }
 
-  if (data.passenger_name) {
-    lines.push(`Mijoz ismi: ${data.passenger_name}`)
-  }
-
-  if (data.passenger_phone) {
-    lines.push(`Telefon: ${formatPhone(data.passenger_phone)}`)
-  }
-
-  lines.push(`Izoh: ${data.comment || '-'}`)
-  lines.push(`Holat: ${statusLabel}`)
-
-  if (options.driver) {
-    lines.push(`Haydovchi: ${options.driver.name}`)
-    lines.push(`Telefon: ${formatPhone(options.driver.phone)}`)
-
-    if (options.driver.carModel) {
-      lines.push(`Mashina: ${options.driver.carModel}`)
-    }
+  if (options.driver?.name) {
+    lines.push(`🚖 Haydovchi: ${options.driver.name}`)
   }
 
   return lines.join('\n')
@@ -206,12 +191,23 @@ function buildPassengerFoundMessage(driver, ratingInfo) {
 
 function buildDriverPassengerMessage(booking) {
   return [
-    "✅ Yo'lovchi ma'lumoti:",
-    `Ism: ${booking.passengerName || '-'}`,
-    `Tel: ${formatPhone(booking.passengerPhone) || '-'}`,
-    `Yo'nalish: ${booking.route || '-'}`,
-    `Vaqt: ${booking.time || '-'}`,
+    "✅ Yo'lovchi tasdiqladi!",
+    '',
+    `👤 Yo'lovchi: ${booking.passengerName || '-'}`,
+    `📞 Telefon: ${formatPhone(booking.passengerPhone) || '-'}`,
+    `📍 Yo'nalish: ${booking.route || '-'}`,
+    `🕐 Vaqt: ${booking.time || '-'}`,
+    '',
+    "Yo'lga chiqishingiz mumkin! 🚗",
   ].join('\n')
+}
+
+function buildCancelledGroupMessage(bookingId) {
+  return `❌ Ariza #${bookingId} — yo'lovchi tomonidan bekor qilindi`
+}
+
+function buildDriverCancellationMessage() {
+  return "❌ Kechirasiz, yo'lovchi arizani bekor qildi."
 }
 
 function buildTripCompletionRequestMessage() {
@@ -393,6 +389,80 @@ async function editGroupMessageForStatus(bookingId, booking, options = {}) {
     text,
     extra,
   )
+}
+
+async function cancelGroupMessage(chatId, messageId) {
+  if (!chatId || !messageId) {
+    return
+  }
+
+  await getBot().telegram.deleteMessage(chatId, Number(messageId))
+}
+
+async function markGroupMessageCancelled(booking) {
+  if (!booking.groupChatId || !booking.groupMessageId) {
+    return
+  }
+
+  await getBot().telegram.editMessageText(
+    booking.groupChatId,
+    Number(booking.groupMessageId),
+    undefined,
+    buildCancelledGroupMessage(booking.bookingId),
+    {
+      reply_markup: {
+        inline_keyboard: [],
+      },
+    },
+  )
+}
+
+async function handleCancelledBooking(booking) {
+  const previousStatus = String(booking?.previousStatus || '')
+    .trim()
+    .toLowerCase()
+  const pending = clearPendingConfirmation(booking?.bookingId)
+  const driverTelegramId = String(
+    pending?.driverTelegramId || booking?.driverTelegramId || '',
+  ).trim()
+  const operations = []
+
+  if (previousStatus === 'yangi' && booking?.groupChatId && booking?.groupMessageId) {
+    operations.push({
+      warning: 'booking_group_delete_failed',
+      task: cancelGroupMessage(booking.groupChatId, booking.groupMessageId),
+    })
+  }
+
+  if (previousStatus === 'kutilmoqda') {
+    if (booking?.groupChatId && booking?.groupMessageId) {
+      operations.push({
+        warning: 'booking_group_cancel_update_failed',
+        task: markGroupMessageCancelled(booking),
+      })
+    }
+
+    if (driverTelegramId) {
+      operations.push({
+        warning: 'driver_cancellation_notify_failed',
+        task: getBot().telegram.sendMessage(
+          driverTelegramId,
+          buildDriverCancellationMessage(),
+        ),
+      })
+    }
+  }
+
+  const results = await Promise.allSettled(operations.map((operation) => operation.task))
+
+  return results.flatMap((result, index) => {
+    if (result.status === 'fulfilled') {
+      return []
+    }
+
+    console.error('[Bot] Booking cancellation side effect failed:', result.reason?.message || result.reason)
+    return [operations[index].warning]
+  })
 }
 
 async function schedulePendingConfirmation(booking, driver) {
@@ -680,10 +750,6 @@ function attachBotHandlers(botInstance) {
       try {
         await ctx.telegram.sendMessage(
           pending.driverTelegramId,
-          "✅ Yo'lovchi tasdiqladi! Yo'lga chiqishingiz mumkin.",
-        )
-        await ctx.telegram.sendMessage(
-          pending.driverTelegramId,
           buildDriverPassengerMessage(booking),
         )
         await ctx.telegram.sendMessage(
@@ -901,4 +967,11 @@ async function startBot() {
   return botInstance
 }
 
-module.exports = { getBot, notifyBookingGroup, confirmToUser, startBot }
+module.exports = {
+  cancelGroupMessage,
+  confirmToUser,
+  getBot,
+  handleCancelledBooking,
+  notifyBookingGroup,
+  startBot,
+}

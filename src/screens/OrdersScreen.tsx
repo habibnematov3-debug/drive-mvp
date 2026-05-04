@@ -9,14 +9,28 @@ import { cn } from '../lib/utils'
 type OrdersScreenProps = {
   orders: RideRequest[]
   isLoading?: boolean
+  isRefreshing?: boolean
+  onCancelOrder?: (
+    orderId: string,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>
+  onRefreshOrders?: () => Promise<unknown> | unknown
 }
 
 type StatusFilter = 'all' | RequestStatus
 
-export default function OrdersScreen({ orders, isLoading = false }: OrdersScreenProps) {
+export default function OrdersScreen({
+  orders,
+  isLoading = false,
+  isRefreshing = false,
+  onCancelOrder,
+  onRefreshOrders,
+}: OrdersScreenProps) {
   const { t } = useLanguage()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [bookingToCancel, setBookingToCancel] = useState<RideRequest | null>(null)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   const stats = useMemo(() => {
     const matched = orders.filter((order) => order.status === 'matched').length
@@ -49,6 +63,41 @@ export default function OrdersScreen({ orders, isLoading = false }: OrdersScreen
     { key: 'cancelled', label: t('orders.filterCancelled') },
   ]
 
+  const canRefresh = typeof onRefreshOrders === 'function'
+  const canCancelOrder = (order: RideRequest) =>
+    typeof onCancelOrder === 'function' && order.status === 'submitted'
+
+  function openCancelDialog(order: RideRequest) {
+    setCancelError(null)
+    setBookingToCancel(order)
+  }
+
+  function closeCancelDialog() {
+    if (isCancelling) return
+    setCancelError(null)
+    setBookingToCancel(null)
+  }
+
+  async function handleConfirmCancellation() {
+    if (!bookingToCancel || !onCancelOrder) {
+      return
+    }
+
+    setIsCancelling(true)
+    setCancelError(null)
+
+    const result = await onCancelOrder(bookingToCancel.id)
+
+    if (!result.ok) {
+      setCancelError(result.error || "Arizani bekor qilib bo'lmadi")
+      setIsCancelling(false)
+      return
+    }
+
+    setIsCancelling(false)
+    setBookingToCancel(null)
+  }
+
   return (
     <div className="flex flex-col h-full screen-enter pb-2">
       {/* Stats Header */}
@@ -70,6 +119,29 @@ export default function OrdersScreen({ orders, isLoading = false }: OrdersScreen
       {/* Search & Filter */}
       <div className="mt-4 px-1">
         <div className="rounded-[32px] border border-brand-line bg-white p-4 shadow-soft">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="text-[11px] font-bold uppercase tracking-[0.24em] text-brand-muted">
+              Arizalar
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (canRefresh) {
+                  void onRefreshOrders()
+                }
+              }}
+              disabled={!canRefresh || isRefreshing || isLoading}
+              className={cn(
+                'rounded-[16px] border px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] transition',
+                !canRefresh || isRefreshing || isLoading
+                  ? 'cursor-not-allowed border-brand-line bg-brand-soft/40 text-brand-muted'
+                  : 'border-brand-blue/20 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue hover:text-white',
+              )}
+            >
+              {isRefreshing ? 'Yangilanmoqda...' : 'Yangilash'}
+            </button>
+          </div>
+
           <div className="relative flex items-center mb-3">
             <Search className="absolute left-4 h-5 w-5 text-brand-muted pointer-events-none" />
             <input
@@ -122,9 +194,23 @@ export default function OrdersScreen({ orders, isLoading = false }: OrdersScreen
             ))}
           </div>
         ) : filtered.length > 0 ? (
-          <div className="space-y-3 pb-8">
+          <div className="space-y-0 pb-8">
             {filtered.map((order) => (
-              <OrderCard key={order.id} order={order} />
+              <div key={order.id}>
+                <OrderCard order={order} />
+
+                {canCancelOrder(order) ? (
+                  <div className="-mt-px mx-3 rounded-b-[28px] border border-t-0 border-brand-line bg-white px-4 pb-4 pt-3 shadow-soft">
+                    <button
+                      type="button"
+                      onClick={() => openCancelDialog(order)}
+                      className="w-full rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-600 transition hover:bg-red-600 hover:text-white active:scale-[0.99]"
+                    >
+                      ❌ Bekor qilish
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             ))}
           </div>
         ) : (
@@ -140,14 +226,72 @@ export default function OrdersScreen({ orders, isLoading = false }: OrdersScreen
               {t('orders.emptyHint')}
             </p>
             <button 
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                if (canRefresh) {
+                  void onRefreshOrders()
+                  return
+                }
+                window.location.reload()
+              }}
               className="mt-6 text-sm font-bold text-brand-blue uppercase tracking-widest hover:underline"
             >
-              {t('common.refresh') || 'Refresh'}
+              Yangilash
             </button>
           </div>
         )}
       </div>
+
+      {bookingToCancel ? (
+        <div className="fixed inset-0 z-50 flex items-end bg-brand-ink/45 px-4 pb-6 pt-12">
+          <div
+            className="mx-auto w-full max-w-md rounded-[32px] border border-brand-line bg-white p-5 shadow-soft"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-booking-title"
+            aria-describedby="cancel-booking-description"
+          >
+            <div
+              id="cancel-booking-title"
+              className="text-lg font-black text-brand-ink"
+            >
+              Arizani bekor qilmoqchimisiz?
+            </div>
+            <p
+              id="cancel-booking-description"
+              className="mt-2 text-sm font-medium leading-relaxed text-brand-muted"
+            >
+              Bekor qilsangiz, bu ariza endi haydovchilarga ko&apos;rsatilmaydi.
+            </p>
+
+            {cancelError ? (
+              <div className="mt-4 rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                {cancelError}
+              </div>
+            ) : null}
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={closeCancelDialog}
+                disabled={isCancelling}
+                className="rounded-[18px] border border-brand-line px-4 py-3 text-sm font-black text-brand-ink transition hover:bg-brand-soft/40 disabled:cursor-not-allowed disabled:text-brand-muted"
+              >
+                Yo&apos;q
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleConfirmCancellation()
+                }}
+                disabled={isCancelling}
+                className="rounded-[18px] bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+              >
+                {isCancelling ? 'Bekor qilinmoqda...' : 'Ha, bekor qilish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

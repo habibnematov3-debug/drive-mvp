@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { routeLabels } from './data/mock'
 import AppLayout from './layout/AppLayout'
@@ -21,6 +21,7 @@ import {
 } from './utils/telegram'
 
 type AuthState = 'loading' | 'ready' | 'telegram_required' | 'error'
+type OrderActionResult = { ok: true } | { ok: false; error: string }
 const SUPPORT_TELEGRAM_URL = 'https://t.me/drivee_inc'
 
 function isNetworkFetchError(error: unknown) {
@@ -56,6 +57,7 @@ export default function App() {
   const [orders, setOrders] = useState<RideRequest[]>([])
   const [passenger, setPassenger] = useState<Passenger | null>(null)
   const [isOrdersLoading, setIsOrdersLoading] = useState(false)
+  const [isOrdersRefreshing, setIsOrdersRefreshing] = useState(false)
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [authError, setAuthError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -65,6 +67,104 @@ export default function App() {
       : tab === 'orders'
         ? t('header.ordersSubtitle')
         : t('header.profileSubtitle')
+
+  const loadOrders = useCallback(
+    async ({
+      signal,
+      telegramUserId,
+    }: {
+      signal?: AbortSignal
+      telegramUserId?: string
+    } = {}) => {
+      const apiBaseUrl = getApiBaseUrl()
+
+      if (!apiBaseUrl) {
+        throw new Error(t('auth.connectionError'))
+      }
+
+      const requestsResponse = await fetchWithRetry(
+        `${apiBaseUrl}/requests`,
+        {
+          signal,
+          headers: buildTelegramAuthHeaders(telegramUserId),
+        },
+        {
+          retries: 2,
+          timeoutMs: 20_000,
+          initialDelayMs: 1_100,
+        },
+      )
+      const responseBody = await requestsResponse.text()
+      const contentType = requestsResponse.headers.get('content-type') ?? ''
+
+      if (!contentType.includes('application/json')) {
+        throw new Error(t('orders.loading'))
+      }
+
+      const result = JSON.parse(responseBody) as {
+        success?: boolean
+        error?: string
+        requests?: RideRequest[]
+      }
+
+      if (
+        !requestsResponse.ok ||
+        !result.success ||
+        !Array.isArray(result.requests)
+      ) {
+        throw new Error(result.error || t('orders.loading'))
+      }
+
+      return result.requests
+    },
+    [t],
+  )
+
+  const refreshOrders = useCallback(
+    async ({
+      signal,
+      silent = false,
+      telegramUserId,
+    }: {
+      signal?: AbortSignal
+      silent?: boolean
+      telegramUserId?: string
+    } = {}): Promise<OrderActionResult> => {
+      if (silent) {
+        setIsOrdersRefreshing(true)
+      } else {
+        setIsOrdersLoading(true)
+      }
+
+      try {
+        const nextOrders = await loadOrders({ signal, telegramUserId })
+
+        if (!signal?.aborted) {
+          setOrders(nextOrders)
+        }
+
+        return { ok: true }
+      } catch (error) {
+        if (signal?.aborted) {
+          return { ok: false, error: t('orders.loading') }
+        }
+
+        const errorMessage =
+          error instanceof Error ? error.message : t('orders.loading')
+        setToast(errorMessage)
+        return { ok: false, error: errorMessage }
+      } finally {
+        if (!signal?.aborted) {
+          if (silent) {
+            setIsOrdersRefreshing(false)
+          } else {
+            setIsOrdersLoading(false)
+          }
+        }
+      }
+    },
+    [loadOrders, t],
+  )
 
   useEffect(() => {
     const webApp = getTelegramWebApp()
@@ -113,49 +213,13 @@ export default function App() {
       }
     }
 
-    async function loadOrders() {
-      const requestsResponse = await fetchWithRetry(
-        `${apiBaseUrl}/requests`,
-        {
-          signal: controller.signal,
-          headers: buildTelegramAuthHeaders(telegramUser?.id?.toString()),
-        },
-        {
-          retries: 2,
-          timeoutMs: 20_000,
-          initialDelayMs: 1_100,
-        },
-      )
-      const responseBody = await requestsResponse.text()
-      const contentType = requestsResponse.headers.get('content-type') ?? ''
-
-      if (!contentType.includes('application/json')) {
-        throw new Error(t('orders.loading'))
-      }
-
-      const result = JSON.parse(responseBody) as {
-        success?: boolean
-        error?: string
-        requests?: RideRequest[]
-      }
-
-      if (
-        !requestsResponse.ok ||
-        !result.success ||
-        !Array.isArray(result.requests)
-      ) {
-        throw new Error(result.error || t('orders.loading'))
-      }
-
-      setOrders(result.requests)
-    }
-
     async function bootstrap() {
       setAuthState('loading')
       setAuthError(null)
       setOrders([])
       setPassenger(null)
       setIsOrdersLoading(false)
+      setIsOrdersRefreshing(false)
 
       try {
         await warmUpBackend()
@@ -194,6 +258,11 @@ export default function App() {
         const nextPassenger = buildPassengerFromTelegram(authResult.user)
         setPassenger(nextPassenger)
         setAuthState('ready')
+
+        await refreshOrders({
+          signal: controller.signal,
+          telegramUserId: nextPassenger.telegramUserId,
+        })
       } catch (error) {
         if (controller.signal.aborted) return
         const nextAuthError =
@@ -208,30 +277,12 @@ export default function App() {
         setAuthError(nextAuthError)
         return
       }
-
-      setIsOrdersLoading(true)
-      try {
-        await loadOrders()
-      } catch (ordersError) {
-        if (!controller.signal.aborted) {
-          setOrders([])
-          setToast(
-            ordersError instanceof Error
-              ? ordersError.message
-              : t('orders.loading'),
-          )
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsOrdersLoading(false)
-        }
-      }
     }
 
     bootstrap()
 
     return () => controller.abort()
-  }, [t])
+  }, [refreshOrders, t])
 
   useEffect(() => {
     if (!toast) return
@@ -239,6 +290,21 @@ export default function App() {
     const timeoutId = window.setTimeout(() => setToast(null), 2400)
     return () => window.clearTimeout(timeoutId)
   }, [toast])
+
+  useEffect(() => {
+    if (authState !== 'ready' || !passenger?.telegramUserId) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshOrders({
+        silent: true,
+        telegramUserId: passenger.telegramUserId,
+      })
+    }, 30_000)
+
+    return () => window.clearInterval(intervalId)
+  }, [authState, passenger?.telegramUserId, refreshOrders])
 
   function addOrder(request: RequestFormData, bookingId: string) {
     const nextOrder: RideRequest = {
@@ -259,6 +325,77 @@ export default function App() {
 
     setOrders((prev) => [nextOrder, ...prev])
   }
+
+  const handleRefreshOrders = useCallback(() => {
+    return refreshOrders({
+      silent: true,
+      telegramUserId: passenger?.telegramUserId,
+    })
+  }, [passenger?.telegramUserId, refreshOrders])
+
+  const handleCancelOrder = useCallback(
+    async (bookingId: string): Promise<OrderActionResult> => {
+      const apiBaseUrl = getApiBaseUrl()
+
+      if (!apiBaseUrl) {
+        const error = t('auth.connectionError')
+        setToast(error)
+        return { ok: false, error }
+      }
+
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/bookings/${encodeURIComponent(bookingId)}`,
+          {
+            method: 'DELETE',
+            headers: buildTelegramAuthHeaders(passenger?.telegramUserId),
+          },
+        )
+
+        const responseBody = await response.text()
+        const contentType = response.headers.get('content-type') ?? ''
+        const statusLabel = `${response.status} ${response.statusText}`.trim()
+
+        if (!contentType.includes('application/json')) {
+          throw new Error(
+            `API noto'g'ri javob qaytardi (${statusLabel}): ${responseBody}`,
+          )
+        }
+
+        const result = JSON.parse(responseBody) as {
+          success?: boolean
+          error?: string
+          message?: string
+        }
+
+        if (!response.ok || !result.success) {
+          const error = result.error || `So'rov bajarilmadi (${statusLabel})`
+          setToast(error)
+          return { ok: false, error }
+        }
+
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === bookingId
+              ? {
+                  ...order,
+                  status: 'cancelled',
+                }
+              : order,
+          ),
+        )
+
+        setToast(result.message || 'Ariza bekor qilindi')
+        return { ok: true }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Arizani bekor qilib bo'lmadi"
+        setToast(errorMessage)
+        return { ok: false, error: errorMessage }
+      }
+    },
+    [passenger?.telegramUserId, t],
+  )
 
   function handleSupport() {
     openTelegramUrl(SUPPORT_TELEGRAM_URL)
@@ -296,7 +433,13 @@ export default function App() {
             telegramUserId={passenger.telegramUserId}
           />
         ) : tab === 'orders' ? (
-          <OrdersScreen orders={orders} isLoading={isOrdersLoading} />
+          <OrdersScreen
+            orders={orders}
+            isLoading={isOrdersLoading}
+            isRefreshing={isOrdersRefreshing}
+            onCancelOrder={handleCancelOrder}
+            onRefreshOrders={handleRefreshOrders}
+          />
         ) : (
           <ProfileScreen
             passenger={passenger}

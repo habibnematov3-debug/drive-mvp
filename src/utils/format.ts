@@ -90,7 +90,7 @@ export function formatRequestStatus(
 ) {
   if (!t) {
     if (status === 'matched') return 'Haydovchi topildi'
-    if (status === 'cancelled') return 'Bekor qilingan'
+    if (status === 'cancelled') return 'Bekor qilindi'
     return 'Qabul qilingan'
   }
 

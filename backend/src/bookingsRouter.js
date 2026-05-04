@@ -1,6 +1,14 @@
 const express = require('express')
-const { confirmToUser, notifyBookingGroup } = require('./bot')
-const { appendBooking, listBookingsByTelegramUser } = require('./sheets')
+const {
+  confirmToUser,
+  handleCancelledBooking,
+  notifyBookingGroup,
+} = require('./bot')
+const {
+  appendBooking,
+  cancelBooking,
+  listBookingsByTelegramUser,
+} = require('./sheets')
 const { requireTelegramUser } = require('./telegramAuth')
 const { validateBookingInput } = require('./validation')
 
@@ -64,6 +72,78 @@ router.post('/', requireTelegramUser, async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Internal server error. Please try again.',
+    })
+  }
+})
+
+router.delete('/:id', requireTelegramUser, async (req, res) => {
+  const bookingId = String(req.params.id || '').trim()
+
+  if (!bookingId) {
+    return res.status(400).json({
+      success: false,
+      error: "Ariza ID topilmadi",
+    })
+  }
+
+  try {
+    const cancelResult = await cancelBooking(bookingId, String(req.telegramUser.id))
+
+    if (!cancelResult.ok) {
+      if (cancelResult.reason === 'forbidden') {
+        return res.status(403).json({
+          success: false,
+          error: "Bu ariza sizga tegishli emas",
+        })
+      }
+
+      if (cancelResult.reason === 'already_confirmed') {
+        return res.status(409).json({
+          success: false,
+          error: "Tasdiqlangan arizani bekor qilib bo'lmaydi",
+        })
+      }
+
+      if (cancelResult.reason === 'already_completed') {
+        return res.status(409).json({
+          success: false,
+          error: "Tugallangan arizani bekor qilib bo'lmaydi",
+        })
+      }
+
+      if (cancelResult.reason === 'already_cancelled') {
+        return res.status(409).json({
+          success: false,
+          error: "Bu ariza allaqachon bekor qilingan",
+        })
+      }
+
+      if (cancelResult.reason === 'not_found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Ariza topilmadi',
+        })
+      }
+
+      return res.status(409).json({
+        success: false,
+        error: "Bu arizani bekor qilib bo'lmaydi",
+      })
+    }
+
+    const warnings = await handleCancelledBooking(cancelResult.booking)
+
+    return res.json({
+      success: true,
+      booking_id: cancelResult.booking.bookingId,
+      message: 'Ariza bekor qilindi',
+      warnings,
+    })
+  } catch (error) {
+    console.error('[Booking] Error cancelling booking:', error.message)
+    return res.status(500).json({
+      success: false,
+      error: "Serverda xatolik yuz berdi. Qayta urinib ko'ring.",
     })
   }
 })

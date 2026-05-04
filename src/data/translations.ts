@@ -160,7 +160,7 @@ export const translations: Translations = {
   status: {
     submitted: { uz: 'Qabul qilindi', ru: 'Принята' },
     matched: { uz: 'Haydovchi topildi', ru: 'Водитель найден' },
-    cancelled: { uz: 'Bekor qilingan', ru: 'Отменена' },
+    cancelled: { uz: 'Bekor qilindi', ru: 'Отменена' },
   },
   routes: {
     kokandTashkent: { uz: "Qo'qon -> Toshkent", ru: 'Коканд -> Ташкент' },

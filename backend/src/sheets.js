@@ -57,6 +57,7 @@ const BOOKING_STATUS_NEW = 'yangi'
 const BOOKING_STATUS_PENDING = 'kutilmoqda'
 const BOOKING_STATUS_IN_PROGRESS = 'jarayonda'
 const BOOKING_STATUS_COMPLETED = 'tugallandi'
+const BOOKING_STATUS_CANCELLED = 'bekor qilindi'
 
 const ROUTE_LABELS_BY_ID = {
   'kokand-tashkent': 'Kokand -> Tashkent',
@@ -955,6 +956,60 @@ async function completeBooking(bookingId, driverTelegramId) {
   })
 }
 
+async function cancelBooking(bookingId, telegramUserId) {
+  return withBookingLock(bookingId, async () => {
+    const booking = await findBookingById(bookingId)
+
+    if (!booking) {
+      return { ok: false, reason: 'not_found' }
+    }
+
+    if (
+      telegramUserId &&
+      booking.record.passengerTelegramUserId !== String(telegramUserId)
+    ) {
+      return { ok: false, reason: 'forbidden', booking: booking.record }
+    }
+
+    if (booking.record.status === BOOKING_STATUS_IN_PROGRESS) {
+      return { ok: false, reason: 'already_confirmed', booking: booking.record }
+    }
+
+    if (booking.record.status === BOOKING_STATUS_COMPLETED) {
+      return { ok: false, reason: 'already_completed', booking: booking.record }
+    }
+
+    if (booking.record.status === BOOKING_STATUS_CANCELLED) {
+      return { ok: false, reason: 'already_cancelled', booking: booking.record }
+    }
+
+    if (
+      booking.record.status !== BOOKING_STATUS_NEW &&
+      booking.record.status !== BOOKING_STATUS_PENDING
+    ) {
+      return { ok: false, reason: 'not_cancellable', booking: booking.record }
+    }
+
+    const previousStatus = booking.record.status
+    const nextRow = {
+      ...booking.record.rowObject,
+      holat: BOOKING_STATUS_CANCELLED,
+    }
+
+    await updateBookingRow(booking.record.rowNumber, nextRow)
+
+    return {
+      ok: true,
+      booking: {
+        ...booking.record,
+        previousStatus,
+        status: BOOKING_STATUS_CANCELLED,
+        rowObject: nextRow,
+      },
+    }
+  })
+}
+
 async function resetPendingBooking(bookingId, options = {}) {
   return withBookingLock(bookingId, async () => {
     const booking = await findBookingById(bookingId)
@@ -1006,6 +1061,7 @@ async function resetPendingBooking(bookingId, options = {}) {
 
 module.exports = {
   appendBooking,
+  cancelBooking,
   claimBooking,
   completeBooking,
   confirmPendingBooking,
