@@ -33,6 +33,7 @@ export interface RideRequest {
   status: RequestStatus
   comment?: string
   createdAtISO: string
+  updatedAtISO?: string
   driver?: DriverInfo
 }
 

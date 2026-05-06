@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import OrderCard from '../components/OrderCard'
 import { useLanguage } from '../contexts/LanguageContext'
 import type { RequestStatus, RideRequest } from '../types/drivee'
 import { Search, ClipboardList, RefreshCw } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { getApiBaseUrl } from '../utils/api'
-import { fetchWithRetry } from '../utils/network'
-import { buildTelegramAuthHeaders } from '../utils/telegram'
+import { useOrderPolling } from '../hooks/useOrderPolling'
+import { getTelegramUser } from '../utils/telegram'
 
 type OrdersScreenProps = {
-  orders: RideRequest[]
+  orders?: RideRequest[]
   isLoading?: boolean
   isRefreshing?: boolean
   onCancelOrder?: (
@@ -25,8 +24,6 @@ type VisualBookingState =
   | 'jarayonda'
   | 'tugallandi'
   | 'bekor_qilindi'
-
-const POLL_INTERVAL_MS = 15_000
 
 function getVisualBookingState(order: RideRequest): VisualBookingState {
   const normalizedStatus = String(order.status || '').trim().toLowerCase()
@@ -86,200 +83,52 @@ function getVisualBookingMeta(state: VisualBookingState) {
 }
 
 export default function OrdersScreen({
-  orders,
+  orders: propsOrders,
   isLoading = false,
-  isRefreshing = false,
+  isRefreshing: propsRefreshing = false,
   onCancelOrder,
+  onRefreshOrders,
 }: OrdersScreenProps) {
   const { t } = useLanguage()
+  const telegramUser = getTelegramUser()
+
+  // Use hook for polling if orders not provided by parent
+  const {
+    orders: hookOrders,
+    isRefreshing: hookRefreshing,
+    refresh: hookRefresh,
+  } = useOrderPolling({
+    enabled: !propsOrders || propsOrders.length === 0,
+    pollIntervalMs: 10_000,
+    telegramUserId: telegramUser?.id?.toString(),
+  })
+
+  // Prefer parent-provided orders, fall back to hook orders
+  const orders = propsOrders ?? hookOrders
+  const isRefreshing = propsRefreshing || hookRefreshing
+
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [liveOrders, setLiveOrders] = useState<RideRequest[]>(orders)
   const [bookingToCancel, setBookingToCancel] = useState<RideRequest | null>(null)
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [isCancelling, setIsCancelling] = useState(false)
-  const [isDocumentVisible, setIsDocumentVisible] = useState(
-    typeof document === 'undefined' ? true : document.visibilityState === 'visible',
-  )
-  const [isLiveRefreshing, setIsLiveRefreshing] = useState(false)
-  const [refreshNoticeVisible, setRefreshNoticeVisible] = useState(false)
-  const [refreshError, setRefreshError] = useState<string | null>(null)
-  const liveOrdersRef = useRef<RideRequest[]>(orders)
-  const etagRef = useRef('')
-  const refreshInFlightRef = useRef(false)
-
-  useEffect(() => {
-    setLiveOrders(orders)
-    liveOrdersRef.current = orders
-  }, [orders])
-
-  useEffect(() => {
-    if (!refreshNoticeVisible) return
-
-    const timeoutId = window.setTimeout(() => {
-      setRefreshNoticeVisible(false)
-    }, 2200)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [refreshNoticeVisible])
-
-  const refreshBookings = useCallback(
-    async ({
-      showIndicator = true,
-      manual = false,
-    }: {
-      showIndicator?: boolean
-      manual?: boolean
-    } = {}) => {
-      if (refreshInFlightRef.current) {
-        return
-      }
-
-      if (
-        !manual &&
-        typeof document !== 'undefined' &&
-        document.visibilityState !== 'visible'
-      ) {
-        return
-      }
-
-      const apiBaseUrl = getApiBaseUrl()
-
-      if (!apiBaseUrl) {
-        setRefreshError("Server manzili topilmadi. Oxirgi ma'lumot ko'rsatilmoqda.")
-        return
-      }
-
-      refreshInFlightRef.current = true
-      setIsLiveRefreshing(true)
-
-      try {
-        const headers: Record<string, string> = {
-          Accept: 'application/json',
-          ...buildTelegramAuthHeaders(),
-        }
-
-        if (etagRef.current) {
-          headers['If-None-Match'] = etagRef.current
-        }
-
-        const response = await fetchWithRetry(
-          `${apiBaseUrl}/bookings`,
-          {
-            method: 'GET',
-            headers,
-          },
-          {
-            retries: 1,
-            timeoutMs: 12_000,
-            initialDelayMs: 700,
-          },
-        )
-
-        if (response.status === 304) {
-          setRefreshError(null)
-          return
-        }
-
-        const responseBody = await response.text()
-        const contentType = response.headers.get('content-type') ?? ''
-        const statusLabel = `${response.status} ${response.statusText}`.trim()
-
-        if (!contentType.includes('application/json')) {
-          throw new Error(`Server noto'g'ri javob qaytardi (${statusLabel}).`)
-        }
-
-        const result = JSON.parse(responseBody) as {
-          success?: boolean
-          error?: string
-          requests?: RideRequest[]
-        }
-
-        if (!response.ok || !result.success || !Array.isArray(result.requests)) {
-          throw new Error(result.error || "Arizalarni yangilab bo'lmadi.")
-        }
-
-        const nextEtag = String(response.headers.get('etag') || '').trim()
-        const didChange = Boolean(etagRef.current) && nextEtag !== etagRef.current
-
-        if (nextEtag) {
-          etagRef.current = nextEtag
-        }
-
-        liveOrdersRef.current = result.requests
-        setLiveOrders(result.requests)
-        setRefreshError(null)
-
-        if (showIndicator && didChange) {
-          setRefreshNoticeVisible(true)
-        }
-      } catch (error) {
-        const fallbackMessage =
-          liveOrdersRef.current.length > 0
-            ? "Yangilab bo'lmadi. Oxirgi ma'lumot ko'rsatilmoqda."
-            : error instanceof Error
-              ? error.message
-              : "Arizalarni yuklab bo'lmadi."
-
-        setRefreshError(fallbackMessage)
-      } finally {
-        refreshInFlightRef.current = false
-        setIsLiveRefreshing(false)
-      }
-    },
-    [],
-  )
-
-  useEffect(() => {
-    if (typeof document === 'undefined') {
-      return
-    }
-
-    const handleVisibilityChange = () => {
-      const isVisible = document.visibilityState === 'visible'
-      setIsDocumentVisible(isVisible)
-
-      if (isVisible) {
-        void refreshBookings({ showIndicator: false })
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [refreshBookings])
-
-  useEffect(() => {
-    void refreshBookings({ showIndicator: false })
-
-    const intervalId = window.setInterval(() => {
-      if (!isDocumentVisible) {
-        return
-      }
-
-      void refreshBookings()
-    }, POLL_INTERVAL_MS)
-
-    return () => window.clearInterval(intervalId)
-  }, [isDocumentVisible, refreshBookings])
 
   const stats = useMemo(() => {
-    const matched = liveOrders.filter(
+    const matched = orders.filter(
       (order) => getVisualBookingState(order) === 'jarayonda',
     ).length
-    const open = liveOrders.filter((order) => {
+    const open = orders.filter((order) => {
       const state = getVisualBookingState(order)
       return state === 'yangi' || state === 'kutilmoqda'
     }).length
 
-    return { total: liveOrders.length, matched, open }
-  }, [liveOrders])
+    return { total: orders.length, matched, open }
+  }, [orders])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
 
-    return liveOrders.filter((order) => {
+    return orders.filter((order) => {
       const visualState = getVisualBookingState(order)
       const visualLabel = getVisualBookingMeta(visualState).label.toLowerCase()
       const byStatus =
@@ -299,7 +148,7 @@ export default function OrdersScreen({
         visualLabel.includes(q)
       )
     })
-  }, [liveOrders, query, statusFilter])
+  }, [orders, query, statusFilter])
 
   const filters: Array<{ key: StatusFilter; label: string }> = [
     { key: 'all', label: t('orders.filterAll') },
@@ -323,6 +172,14 @@ export default function OrdersScreen({
     setBookingToCancel(null)
   }
 
+  async function handleManualRefresh() {
+    if (onRefreshOrders && typeof onRefreshOrders === 'function') {
+      await onRefreshOrders()
+    } else {
+      await hookRefresh({ manual: true, showIndicator: true })
+    }
+  }
+
   async function handleConfirmCancellation() {
     if (!bookingToCancel || !onCancelOrder) {
       return
@@ -339,22 +196,16 @@ export default function OrdersScreen({
       return
     }
 
-    const nextOrders = liveOrdersRef.current.map((order) =>
-      order.id === bookingToCancel.id
-        ? {
-            ...order,
-            status: 'cancelled' as const,
-          }
-        : order,
-    )
-
-    liveOrdersRef.current = nextOrders
-    setLiveOrders(nextOrders)
     setIsCancelling(false)
     setBookingToCancel(null)
-  }
 
-  const isRefreshBusy = isRefreshing || isLiveRefreshing
+    // Trigger refresh to get latest data
+    if (onRefreshOrders && typeof onRefreshOrders === 'function') {
+      await onRefreshOrders()
+    } else {
+      await hookRefresh({ manual: false, showIndicator: false })
+    }
+  }
 
   return (
     <div className="flex flex-col h-full screen-enter pb-2">
@@ -386,36 +237,25 @@ export default function OrdersScreen({
               Arizalar
             </div>
 
-            <div className="flex items-center gap-3">
-              {refreshNoticeVisible ? (
-                <div
-                  aria-live="polite"
-                  className="text-[11px] font-black tracking-wide text-emerald-600"
-                >
-                  🔄 Yangilandi
-                </div>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={() => {
-                  void refreshBookings({ manual: true, showIndicator: true })
-                }}
-                aria-label="Arizalarni yangilash"
-                title="Arizalarni yangilash"
-                disabled={isRefreshBusy}
-                className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-[16px] border transition',
-                  isRefreshBusy
-                    ? 'cursor-not-allowed border-brand-line bg-brand-soft/40 text-brand-muted'
-                    : 'border-brand-blue/20 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue hover:text-white',
-                )}
-              >
-                <RefreshCw
-                  className={cn('h-4 w-4', isRefreshBusy ? 'animate-spin' : '')}
-                />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void handleManualRefresh()
+              }}
+              aria-label="Arizalarni yangilash"
+              title="Arizalarni yangilash"
+              disabled={isRefreshing}
+              className={cn(
+                'flex h-10 w-10 items-center justify-center rounded-[16px] border transition',
+                isRefreshing
+                  ? 'cursor-not-allowed border-brand-line bg-brand-soft/40 text-brand-muted'
+                  : 'border-brand-blue/20 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue hover:text-white',
+              )}
+            >
+              <RefreshCw
+                className={cn('h-4 w-4', isRefreshing ? 'animate-spin' : '')}
+              />
+            </button>
           </div>
 
           <div className="relative mb-3 flex items-center">
@@ -448,17 +288,11 @@ export default function OrdersScreen({
               )
             })}
           </div>
-
-          {refreshError ? (
-            <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-              {refreshError}
-            </div>
-          ) : null}
         </div>
       </div>
 
       <div className="mt-4 flex-1">
-        {isLoading && liveOrders.length === 0 ? (
+        {isLoading && orders.length === 0 ? (
           <div className="space-y-4 px-1">
             {[1, 2, 3].map((key) => (
               <div
@@ -544,7 +378,7 @@ export default function OrdersScreen({
             </p>
             <button
               onClick={() => {
-                void refreshBookings({ manual: true, showIndicator: true })
+                void handleManualRefresh()
               }}
               className="mt-6 text-sm font-bold uppercase tracking-widest text-brand-blue hover:underline"
             >

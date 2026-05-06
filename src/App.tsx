@@ -10,6 +10,7 @@ import type { Passenger, RequestFormData, RideRequest, TabKey } from './types/dr
 import { getApiBaseUrl } from './utils/api'
 import { fetchWithRetry } from './utils/network'
 import { useLanguage } from './contexts/LanguageContext'
+import { useOrderPolling } from './hooks/useOrderPolling'
 import {
   buildTelegramAuthHeaders,
   buildPassengerFromTelegram,
@@ -22,7 +23,7 @@ import {
 
 type AuthState = 'loading' | 'ready' | 'telegram_required' | 'error'
 type OrderActionResult = { ok: true } | { ok: false; error: string }
-const SUPPORT_TELEGRAM_URL = 'https://t.me/drivee_inc'
+const SUPPORT_TELEGRAM_URL = 'https://t.me/drivee8_bot'
 
 function isNetworkFetchError(error: unknown) {
   if (!(error instanceof Error)) return false
@@ -61,6 +62,27 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [authError, setAuthError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+
+  // Start polling once authenticated
+  const {
+    orders: polledOrders,
+    isRefreshing: isPollingRefreshing,
+    refresh: manualRefresh,
+  } = useOrderPolling({
+    enabled: authState === 'ready',
+    pollIntervalMs: 10_000,
+    telegramUserId: passenger?.telegramUserId,
+  })
+
+  // Sync polled orders to local state
+  useEffect(() => {
+    setOrders(polledOrders)
+  }, [polledOrders])
+
+  // Mirror polling state to legacy state for compatibility
+  useEffect(() => {
+    setIsOrdersRefreshing(isPollingRefreshing)
+  }, [isPollingRefreshing])
   const headerSubtitle =
     tab === 'home'
       ? t('header.homeSubtitle')
@@ -312,11 +334,8 @@ export default function App() {
   }
 
   const handleRefreshOrders = useCallback(() => {
-    return refreshOrders({
-      silent: true,
-      telegramUserId: passenger?.telegramUserId,
-    })
-  }, [passenger?.telegramUserId, refreshOrders])
+    return manualRefresh({ manual: true, showIndicator: true })
+  }, [manualRefresh])
 
   const handleCancelOrder = useCallback(
     async (bookingId: string): Promise<OrderActionResult> => {

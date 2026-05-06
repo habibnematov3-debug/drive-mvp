@@ -483,10 +483,12 @@ function parseComment(comment) {
 function mapStatus(status) {
   const normalized = typeof status === 'string' ? status.trim().toLowerCase() : ''
 
+  // Handle completed states (tugallandi, completed)
   if (normalized.includes('tugallandi') || normalized === 'completed') {
     return 'completed'
   }
 
+  // Handle cancelled states (bekor, bekor qilindi, cancelled, canceled)
   if (
     normalized.includes('bekor') ||
     normalized === 'cancelled' ||
@@ -495,14 +497,18 @@ function mapStatus(status) {
     return 'cancelled'
   }
 
+  // Handle matched/in-progress states (jarayonda, kutilmoqda, haydovchi topildi, matched, in_progress)
   if (
     normalized.includes('jarayonda') ||
+    normalized.includes('kutilmoqda') ||
     normalized.includes('haydovchi topildi') ||
-    normalized.includes('matched')
+    normalized.includes('matched') ||
+    normalized.includes('in_progress')
   ) {
     return 'matched'
   }
 
+  // Default to submitted for new/yangi states
   return 'submitted'
 }
 

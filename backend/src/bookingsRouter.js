@@ -28,7 +28,10 @@ router.get('/', requireTelegramUser, async (req, res) => {
       .update(JSON.stringify(payload))
       .digest('hex')}"`
 
-    res.set('Cache-Control', 'private, no-cache, max-age=0')
+    // Prevent caching: no-cache ensures freshness for each poll
+    res.set('Cache-Control', 'private, no-cache, no-store, must-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
     res.set('Vary', 'X-Telegram-Init-Data, X-Drivee-Dev-User-Id')
     res.set('ETag', etag)
 
