@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Check, Filter, Search, Star, X } from 'lucide-react'
-import { Card, PrimaryButton, SecondaryButton } from '../components/ui'
+import { Card } from '../components/ui'
 import { REGIONS, getRegion } from '../data/uzbekistan'
 import { useDrivee } from '../contexts/DriveeContext'
 import type { DriverProfile, RegionId } from '../types/drivee'
