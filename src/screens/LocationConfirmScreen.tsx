@@ -1,33 +1,165 @@
 import { useEffect, useMemo, useState } from 'react'
 import { LocateFixed, MapPin, RefreshCw } from 'lucide-react'
-import { Card, Chip, PrimaryButton, SecondaryButton } from '../components/ui'
+import { Card, PrimaryButton, SecondaryButton } from '../components/ui'
 import { REGIONS, getDistrict, getRegion } from '../data/uzbekistan'
 import { useDrivee } from '../contexts/DriveeContext'
 import { buildLocationLabelUz } from '../state/driveeStore'
-import type { RegionId, UserLocation } from '../types/drivee'
-import { hapticNotify, requestTelegramLocation } from '../utils/telegram'
+import type { DistrictId, RegionId, UserLocation } from '../types/drivee'
+import { hapticNotify, isTelegramMiniApp, requestTelegramLocation } from '../utils/telegram'
 
 type Step = 'loading' | 'confirm' | 'manual'
 
-function reverseGeocodeForDemo(_latitude: number, _longitude: number): UserLocation {
-  const hit = { regionId: 'samarkand' as const, districtId: 'samarkand-juma' }
+type NominatimAddress = {
+  state?: string
+  region?: string
+  county?: string
+  state_district?: string
+  city?: string
+  town?: string
+  village?: string
+  municipality?: string
+  district?: string
+  suburb?: string
+}
+
+type NominatimReverseResponse = {
+  address?: NominatimAddress
+  display_name?: string
+}
+
+const REGION_MATCHERS: Record<RegionId, string[]> = {
+  toshkent: ['toshkent', 'tashkent'],
+  samarkand: ['samarqand', 'samarkand'],
+  fargona: ["farg'ona", 'fargona', 'fergana'],
+  buxoro: ['buxoro', 'bukhara'],
+  namangan: ['namangan'],
+  andijon: ['andijon', 'andijan'],
+  qashqadaryo: ['qashqadaryo', 'kashkadarya', 'qarshi'],
+}
+
+const DISTRICT_MATCHERS: Record<DistrictId, string[]> = {
+  'samarkand-markaz': ['markaz', 'samarqand city', 'samarkand city'],
+  'samarkand-juma': ['juma', 'pastdargom', 'past dargom'],
+  'samarkand-urgut': ['urgut'],
+  'samarkand-kattaqorgon': ["kattaqo'rg'on", 'kattaqorgon', 'katta-kurgan', 'kattakurgan'],
+  'fargona-markaz': ['markaz', 'fargona city', 'fergana city'],
+  'fargona-qoqon': ["qo'qon", 'qoqon', 'kokand'],
+  'fargona-margilon': ["marg'ilon", 'margilon', 'margilan'],
+  'fargona-rishton': ['rishton', 'rishtan'],
+  'buxoro-markaz': ['markaz', 'buxoro city', 'bukhara city'],
+  'buxoro-gijduvon': ["g'ijduvon", 'gijduvon', 'gijduvan'],
+  'buxoro-vobkent': ['vobkent', 'vabkent'],
+  'namangan-markaz': ['markaz', 'namangan city'],
+  'namangan-chust': ['chust'],
+  'namangan-pop': ['pop', 'pap'],
+  'andijon-markaz': ['markaz', 'andijon city', 'andijan city'],
+  'andijon-asaka': ['asaka'],
+  'andijon-shahrixon': ['shahrixon', 'shahrikhan'],
+  'qashqadaryo-markaz': ['markaz', 'qarshi', 'karshi'],
+  'qashqadaryo-shahrisabz': ['shahrisabz'],
+  'qashqadaryo-kitob': ['kitob', 'kitab'],
+}
+
+function normalize(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[ʻ‘’`]/g, "'")
+    .replace(/[^a-z0-9' ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function collectAddressText(address: NominatimAddress, displayName?: string) {
+  return [
+    address.state,
+    address.region,
+    address.county,
+    address.state_district,
+    address.city,
+    address.town,
+    address.village,
+    address.municipality,
+    address.district,
+    address.suburb,
+    displayName,
+  ]
+    .filter((item): item is string => Boolean(item))
+    .map(normalize)
+    .join(' ')
+}
+
+function matchRegion(text: string): RegionId | null {
+  for (const region of REGIONS) {
+    const aliases = REGION_MATCHERS[region.id]
+    if (aliases.some((alias) => text.includes(normalize(alias)))) return region.id
+  }
+
+  return null
+}
+
+function matchDistrict(text: string, regionId: RegionId): DistrictId | undefined {
+  const region = getRegion(regionId)
+  if (!region || region.mode === 'zones') return undefined
+
+  for (const district of region.districts) {
+    const aliases = DISTRICT_MATCHERS[district.id] ?? [district.nameUz]
+    if (aliases.some((alias) => text.includes(normalize(alias)))) return district.id
+  }
+
+  return undefined
+}
+
+async function reverseGeocodeLocation(latitude: number, longitude: number): Promise<UserLocation> {
+  const params = new URLSearchParams({
+    lat: String(latitude),
+    lon: String(longitude),
+    format: 'json',
+    'accept-language': 'uz',
+  })
+
+  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!response.ok) {
+    throw new Error("Joylashuv aniqlanmadi. Tumaningizni qo'lda tanlang.")
+  }
+
+  const payload = (await response.json()) as NominatimReverseResponse
+  const address = payload.address
+  if (!address) {
+    throw new Error("Joylashuv aniqlanmadi. Tumaningizni qo'lda tanlang.")
+  }
+
+  const text = collectAddressText(address, payload.display_name)
+  const regionId = matchRegion(text)
+  if (!regionId) {
+    throw new Error("Bu hudud MVP ro'yxatida yo'q. Tumaningizni qo'lda tanlang.")
+  }
+
+  const districtId = matchDistrict(text, regionId)
+  const region = getRegion(regionId)
+  if (region?.mode === 'tuman_match' && !districtId) {
+    throw new Error("Tuman aniqlanmadi. Tumaningizni qo'lda tanlang.")
+  }
+
+  const location = { regionId, districtId }
 
   return {
-    ...hit,
-    labelUz: buildLocationLabelUz(hit),
+    ...location,
+    labelUz: buildLocationLabelUz(location),
     source: 'gps',
   }
 }
 
 export default function LocationConfirmScreen() {
-  const { state, actions } = useDrivee()
+  const { actions } = useDrivee()
   const [step, setStep] = useState<Step>('loading')
   const [detected, setDetected] = useState<UserLocation | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [manualRegionId, setManualRegionId] = useState<RegionId>('samarkand')
   const [manualDistrictId, setManualDistrictId] = useState('samarkand-juma')
 
-  const roleLabel = state.role === 'driver' ? 'Men hozir:' : 'Siz hozir:'
   const manualRegion = useMemo(() => getRegion(manualRegionId), [manualRegionId])
   const manualDistricts = manualRegion?.districts ?? []
 
@@ -35,17 +167,37 @@ export default function LocationConfirmScreen() {
     let active = true
 
     async function detectLocation() {
+      if (!isTelegramMiniApp()) {
+        setError("Brauzerda GPS o'rniga tumaningizni qo'lda tanlang.")
+        setStep('manual')
+        return
+      }
+
       setStep('loading')
       setError(null)
 
       try {
-        const location = await requestTelegramLocation()
+        const telegramLocation = await requestTelegramLocation()
         if (!active) return
-        setDetected(reverseGeocodeForDemo(location.latitude!, location.longitude!))
+
+        if (
+          typeof telegramLocation.latitude !== 'number' ||
+          typeof telegramLocation.longitude !== 'number'
+        ) {
+          throw new Error("GPS ma'lumoti olinmadi. Tumaningizni qo'lda tanlang.")
+        }
+
+        const userLocation = await reverseGeocodeLocation(
+          telegramLocation.latitude,
+          telegramLocation.longitude,
+        )
+
+        if (!active) return
+        setDetected(userLocation)
         setStep('confirm')
-      } catch {
+      } catch (caught) {
         if (!active) return
-        setError("GPS ishlamadi. Tumaningizni qo'lda tanlang.")
+        setError(caught instanceof Error ? caught.message : "Ulanishda xato. Qayta urinib ko'ring.")
         setStep('manual')
       }
     }
@@ -75,6 +227,12 @@ export default function LocationConfirmScreen() {
     hapticNotify('success')
   }
 
+  function confirmDetectedLocation() {
+    if (!detected) return
+    actions.setLocation(detected)
+    hapticNotify('success')
+  }
+
   return (
     <div className="screen-enter min-h-screen bg-brand-bg px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)]">
       <div>
@@ -97,9 +255,11 @@ export default function LocationConfirmScreen() {
                 <RefreshCw className="h-5 w-5 animate-spin" />
               </div>
               <div>
-                <div className="text-base font-black text-brand-ink">GPS tekshirilmoqda</div>
+                <div className="text-base font-black text-brand-ink">
+                  📡 Joylashuvingiz aniqlanmoqda...
+                </div>
                 <div className="mt-1 text-sm font-semibold text-brand-muted">
-                  Telegram joylashuvingizni so'rayapti.
+                  Telegram GPS ruxsatini so'raydi.
                 </div>
               </div>
             </div>
@@ -108,19 +268,13 @@ export default function LocationConfirmScreen() {
 
         {step === 'confirm' && detected ? (
           <Card className="p-5">
-            <Chip className="border-brand-blue/20 bg-brand-blue/5 text-brand-blue">
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand-blue/20 bg-brand-blue/5 px-3 py-2 text-xs font-extrabold text-brand-blue">
               <MapPin className="h-4 w-4" />
-              {roleLabel} <span className="font-black">{detected.labelUz}</span>
-            </Chip>
+              📍 {detected.labelUz} — bu to'g'rimi?
+            </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <PrimaryButton
-                type="button"
-                onClick={() => {
-                  actions.setLocation(detected)
-                  hapticNotify('success')
-                }}
-              >
-                Tasdiqlash
+              <PrimaryButton type="button" onClick={confirmDetectedLocation}>
+                Ha, to'g'ri ✓
               </PrimaryButton>
               <SecondaryButton type="button" onClick={() => setStep('manual')}>
                 O'zgartirish

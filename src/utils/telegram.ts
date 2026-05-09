@@ -53,6 +53,11 @@ export function getTelegramWebApp() {
   return (window as TelegramWindow).Telegram?.WebApp ?? null
 }
 
+export function isTelegramMiniApp() {
+  const webApp = getTelegramWebApp()
+  return Boolean(webApp?.requestLocation && webApp.initData?.trim())
+}
+
 export function getTelegramInitData() {
   return getTelegramWebApp()?.initData?.trim() || ''
 }
