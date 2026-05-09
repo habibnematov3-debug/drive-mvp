@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Check, MapPin, Send, X } from 'lucide-react'
-import { Card, Chip, PrimaryButton, SecondaryButton } from '../components/ui'
+import { Card, Chip, PrimaryButton } from '../components/ui'
 import { REGIONS, getRegion } from '../data/uzbekistan'
 import { useDrivee } from '../contexts/DriveeContext'
 import type { DriverApplication, RegionId } from '../types/drivee'
