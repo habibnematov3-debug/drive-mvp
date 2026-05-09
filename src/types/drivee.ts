@@ -22,14 +22,14 @@ export type District = {
 export type Region = {
   id: RegionId
   nameUz: string
-  districts: District[]
   mode: 'tuman_match' | 'zones'
+  districts: District[]
 }
 
 export type UserLocation = {
   regionId: RegionId
   districtId?: DistrictId
-  labelUz: string // "Samarqand, Juma tumani"
+  labelUz: string
   source: 'gps' | 'manual'
 }
 
@@ -40,8 +40,42 @@ export type PassengerPreference =
   | 'women_only'
   | 'ac'
 
+export type DriverBadge = 'verified' | 'clean' | 'on_time'
+
+export type DriverProfile = {
+  id: string
+  name: string
+  initials: string
+  home: UserLocation
+  carModel: string
+  carYear: number
+  phone: string
+  verified: boolean
+  activeNow: boolean
+  badges: DriverBadge[]
+  rating: {
+    avg: number
+    trips: number
+    onTimePct: number
+    carPct: number
+    mannersPct: number
+  }
+  reviews: string[]
+}
+
+export type DriverApplication = {
+  id: string
+  driverId: string
+  requestId: string
+  pricePerSeat: number
+  departureWindowLabelUz: 'Hozir' | '30 daqiqada' | '1 soatda' | '2 soatda'
+  note?: string
+  createdAtISO: string
+}
+
 export type PassengerRequest = {
   id: string
+  passengerName: string
   createdAtISO: string
   origin: UserLocation
   destinationRegionId: RegionId
@@ -54,30 +88,18 @@ export type PassengerRequest = {
   selectedDriverId?: string
 }
 
-export type DriverProfile = {
-  id: string
-  name: string
-  home: UserLocation
-  carModel: string
-  carYear: number
-  verified: boolean
-  badges: Array<'verified' | 'clean' | 'on_time'>
-  rating: {
-    avg: number
-    trips: number
-    onTimePct: number
-    carPct: number
-    mannersPct: number
-  }
-}
-
-export type DriverApplication = {
+export type DriverRide = {
   id: string
   driverId: string
-  requestId: string
+  origin: UserLocation
+  destinationRegionId: RegionId
+  departureWindowLabelUz: DriverApplication['departureWindowLabelUz']
+  seatsAvailable: number
   pricePerSeat: number
-  departureWindowLabelUz: 'Hozir' | '30 daqiqada' | '1 soatda' | '2 soatda'
+  frontSeatExtra: number
+  smoking: 'no' | 'yes'
   note?: string
+  status: 'live' | 'closed'
   createdAtISO: string
 }
 
@@ -99,4 +121,44 @@ export type TelegramIdentity = {
   telegramUserId?: string
   name: string
   avatarUrl?: string
+}
+
+// Compatibility types for older components that are no longer routed.
+export type RequestStatus = 'submitted' | 'matched' | 'cancelled' | 'completed'
+
+export type RideRequest = {
+  id: string
+  routeId: string
+  routeLabel: string
+  dateISO: string
+  time: string
+  passengerCount: number
+  fullCar?: boolean
+  hasBag?: boolean
+  status: RequestStatus | string
+  driver?: {
+    name?: string
+    phone?: string
+    carModel?: string
+  }
+}
+
+export type RequestFormData = {
+  routeId: string
+  dateISO: string
+  time: string
+  passengerPhone: string
+  passengerCount: number
+  fullCar: boolean
+  hasBag: boolean
+  passengerGender?: string
+  comment?: string
+}
+
+export type Passenger = {
+  name: string
+  secondaryLine: string
+  languageLabel: string
+  avatarUrl?: string
+  telegramUserId: string
 }

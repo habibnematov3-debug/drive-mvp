@@ -9,7 +9,7 @@ export function Card({
   className?: string
 }) {
   return (
-    <div className={cn('rounded-[28px] border border-brand-line bg-white p-4 shadow-soft', className)}>
+    <div className={cn('rounded-lg border border-brand-line bg-white p-4 shadow-soft', className)}>
       {children}
     </div>
   )
@@ -63,4 +63,3 @@ export function SecondaryButton({
     />
   )
 }
-

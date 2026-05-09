@@ -21,6 +21,9 @@ export function DriveeProvider({ children }: { children: ReactNode }) {
       createPassengerRequest: (payload) => {
         dispatch({ type: 'createPassengerRequest', payload })
       },
+      createDriverRide: (payload) => {
+        dispatch({ type: 'createDriverRide', payload })
+      },
       applyToRequestAsDriver: (requestId, payload) =>
         dispatch({ type: 'applyToRequestAsDriver', payload: { requestId, payload } }),
       selectDriverForRequest: (requestId, driverId) =>
@@ -40,4 +43,3 @@ export function useDrivee() {
   if (!ctx) throw new Error('useDrivee must be used within DriveeProvider')
   return ctx
 }
-

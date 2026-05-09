@@ -14,7 +14,7 @@ export const REGIONS: Region[] = [
     districts: [
       { id: 'samarkand-markaz', regionId: 'samarkand', nameUz: 'Markaz' },
       { id: 'samarkand-juma', regionId: 'samarkand', nameUz: 'Juma' },
-      { id: 'samarkand-urgut', regionId: 'samarkand', nameUz: "Urgut" },
+      { id: 'samarkand-urgut', regionId: 'samarkand', nameUz: 'Urgut' },
       { id: 'samarkand-kattaqorgon', regionId: 'samarkand', nameUz: "Kattaqo'rg'on" },
     ],
   },
@@ -33,25 +33,41 @@ export const REGIONS: Region[] = [
     id: 'buxoro',
     nameUz: 'Buxoro',
     mode: 'tuman_match',
-    districts: [{ id: 'buxoro-markaz', regionId: 'buxoro', nameUz: 'Markaz' }],
+    districts: [
+      { id: 'buxoro-markaz', regionId: 'buxoro', nameUz: 'Markaz' },
+      { id: 'buxoro-gijduvon', regionId: 'buxoro', nameUz: "G'ijduvon" },
+      { id: 'buxoro-vobkent', regionId: 'buxoro', nameUz: 'Vobkent' },
+    ],
   },
   {
     id: 'namangan',
     nameUz: 'Namangan',
     mode: 'tuman_match',
-    districts: [{ id: 'namangan-markaz', regionId: 'namangan', nameUz: 'Markaz' }],
+    districts: [
+      { id: 'namangan-markaz', regionId: 'namangan', nameUz: 'Markaz' },
+      { id: 'namangan-chust', regionId: 'namangan', nameUz: 'Chust' },
+      { id: 'namangan-pop', regionId: 'namangan', nameUz: 'Pop' },
+    ],
   },
   {
     id: 'andijon',
     nameUz: 'Andijon',
     mode: 'tuman_match',
-    districts: [{ id: 'andijon-markaz', regionId: 'andijon', nameUz: 'Markaz' }],
+    districts: [
+      { id: 'andijon-markaz', regionId: 'andijon', nameUz: 'Markaz' },
+      { id: 'andijon-asaka', regionId: 'andijon', nameUz: 'Asaka' },
+      { id: 'andijon-shahrixon', regionId: 'andijon', nameUz: 'Shahrixon' },
+    ],
   },
   {
     id: 'qashqadaryo',
     nameUz: 'Qashqadaryo',
     mode: 'tuman_match',
-    districts: [{ id: 'qashqadaryo-markaz', regionId: 'qashqadaryo', nameUz: 'Markaz' }],
+    districts: [
+      { id: 'qashqadaryo-markaz', regionId: 'qashqadaryo', nameUz: 'Markaz' },
+      { id: 'qashqadaryo-shahrisabz', regionId: 'qashqadaryo', nameUz: 'Shahrisabz' },
+      { id: 'qashqadaryo-kitob', regionId: 'qashqadaryo', nameUz: 'Kitob' },
+    ],
   },
 ]
 
@@ -64,6 +80,6 @@ export function getDistrict(districtId: string) {
     const found = region.districts.find((d) => d.id === districtId)
     if (found) return found
   }
+
   return null
 }
-
