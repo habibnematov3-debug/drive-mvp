@@ -125,7 +125,13 @@ export type TelegramIdentity = {
 
 // Compatibility types for older components that are no longer routed.
 export type RequestStatus = 'submitted' | 'matched' | 'cancelled' | 'completed'
-export type RouteId = string
+export type RouteId =
+  | 'kokand-tashkent'
+  | 'tashkent-kokand'
+  | 'tashkent-samarkand'
+  | 'samarkand-tashkent'
+  | 'tashkent-namangan'
+  | 'namangan-tashkent'
 export type PassengerGender = 'male' | 'female' | 'any'
 
 export type RideRequest = {
@@ -139,7 +145,7 @@ export type RideRequest = {
   passengerCount: number
   fullCar?: boolean
   hasBag?: boolean
-  passengerGender?: PassengerGender
+  passengerGender: PassengerGender
   comment?: string
   status: RequestStatus
   driver?: {
@@ -157,7 +163,7 @@ export type RequestFormData = {
   passengerCount: number
   fullCar: boolean
   hasBag: boolean
-  passengerGender?: string
+  passengerGender: PassengerGender
   comment?: string
 }
 
