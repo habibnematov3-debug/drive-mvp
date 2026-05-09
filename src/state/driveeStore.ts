@@ -35,7 +35,7 @@ export type DriveeActions = {
     timeApprox: string
     seats: number
     preferences: PassengerPreference[]
-  }) => PassengerRequest
+  }) => void
   applyToRequestAsDriver: (requestId: string, payload: Omit<DriverApplication, 'id' | 'createdAtISO' | 'requestId'>) => void
   selectDriverForRequest: (requestId: string, driverId: string) => void
   submitRating: (ratingId: string, rating: NonNullable<PendingRating['rating']>) => void

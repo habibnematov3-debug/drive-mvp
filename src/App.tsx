@@ -69,8 +69,7 @@ export default function App() {
     preferences: PassengerPreference[]
   }) => {
     // reducer will update state; we show a small toast
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    ;(actions as unknown as { createPassengerRequest: (p: unknown) => void }).createPassengerRequest(payload)
+    actions.createPassengerRequest(payload as never)
     setToast('So‘rov yuborildi ✅')
   }
 

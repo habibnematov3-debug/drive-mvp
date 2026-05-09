@@ -20,9 +20,6 @@ export function DriveeProvider({ children }: { children: ReactNode }) {
       clearLocation: () => dispatch({ type: 'clearLocation' }),
       createPassengerRequest: (payload) => {
         dispatch({ type: 'createPassengerRequest', payload })
-        // Return value is used by UI only; we can’t get it from reducer without extra plumbing.
-        // Screen will re-read latest request from state after dispatch.
-        return {} as never
       },
       applyToRequestAsDriver: (requestId, payload) =>
         dispatch({ type: 'applyToRequestAsDriver', payload: { requestId, payload } }),
