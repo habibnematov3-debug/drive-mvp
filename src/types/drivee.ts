@@ -125,17 +125,23 @@ export type TelegramIdentity = {
 
 // Compatibility types for older components that are no longer routed.
 export type RequestStatus = 'submitted' | 'matched' | 'cancelled' | 'completed'
+export type RouteId = string
+export type PassengerGender = 'male' | 'female' | 'any'
 
 export type RideRequest = {
   id: string
-  routeId: string
+  routeId: RouteId
   routeLabel: string
+  createdAtISO?: string
   dateISO: string
   time: string
+  passengerPhone?: string
   passengerCount: number
   fullCar?: boolean
   hasBag?: boolean
-  status: RequestStatus | string
+  passengerGender?: PassengerGender
+  comment?: string
+  status: RequestStatus
   driver?: {
     name?: string
     phone?: string

@@ -136,7 +136,7 @@ export default function RequestsScreen() {
                   <div>
                     <div className="text-base font-black text-brand-ink">{request.passengerName}</div>
                     <div className="mt-1 text-sm font-semibold text-brand-muted">
-                      {request.origin.labelUz} -> {getRegion(request.destinationRegionId)?.nameUz}
+                      {request.origin.labelUz} {'->'} {getRegion(request.destinationRegionId)?.nameUz}
                     </div>
                     <div className="mt-1 text-sm font-semibold text-brand-muted">
                       {request.timeApprox} • {request.seats} ta o'rin
@@ -226,7 +226,7 @@ export default function RequestsScreen() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-base font-black text-brand-ink">
-                      {request.origin.labelUz} -> {getRegion(request.destinationRegionId)?.nameUz}
+                      {request.origin.labelUz} {'->'} {getRegion(request.destinationRegionId)?.nameUz}
                     </div>
                     <div className="mt-1 text-sm font-semibold text-brand-muted">
                       {request.dateISO} • {request.timeApprox} • {request.seats} ta o'rin

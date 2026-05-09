@@ -1,145 +1,42 @@
-import { useLanguage } from '../contexts/LanguageContext'
-import { navItems } from '../data/navigation'
+import { ClipboardList, Home, Star, UserRound } from 'lucide-react'
 import type { TabKey } from '../types/drivee'
+import { cn } from '../lib/utils'
 
 type BottomNavProps = {
   activeTab: TabKey
   onTabChange: (tab: TabKey) => void
 }
 
-function HomeIcon({ active }: { active: boolean }) {
-  const color = active ? '#2F97D4' : '#94A3B8'
-
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 10.5 12 4l8 6.5V20a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 20v-9.5Z"
-        stroke={color}
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9.2 21.5v-7.1c0-.6.5-1.1 1.1-1.1h3.4c.6 0 1.1.5 1.1 1.1v7.1"
-        stroke={color}
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
-function OrdersIcon({ active }: { active: boolean }) {
-  const color = active ? '#1A4FD8' : '#94A3B8'
-
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M7 7h14v14H7V7Z"
-        stroke={color}
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M17 7V5.5A1.5 1.5 0 0 0 15.5 4H4.5A1.5 1.5 0 0 0 3 5.5V16.5A1.5 1.5 0 0 0 4.5 18H7"
-        stroke={color}
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
-function RatingIcon({ active }: { active: boolean }) {
-  const color = active ? '#1A4FD8' : '#94A3B8'
-
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 3.5l2.6 5.4 6 .9-4.3 4.1 1 5.9-5.3-2.8-5.3 2.8 1-5.9-4.3-4.1 6-.9L12 3.5Z"
-        stroke={color}
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function ProfileIcon({ active }: { active: boolean }) {
-  const color = active ? '#1A4FD8' : '#94A3B8'
-
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 12a4.2 4.2 0 1 0-4.2-4.2A4.2 4.2 0 0 0 12 12Z"
-        stroke={color}
-        strokeWidth="1.8"
-      />
-      <path
-        d="M4.5 20.5a8.5 8.5 0 0 1 15 0"
-        stroke={color}
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
+const items: Array<{ tab: TabKey; label: string; Icon: typeof Home }> = [
+  { tab: 'home', label: 'Bosh sahifa', Icon: Home },
+  { tab: 'requests', label: 'Arizalar', Icon: ClipboardList },
+  { tab: 'rating', label: 'Baholash', Icon: Star },
+  { tab: 'profile', label: 'Profil', Icon: UserRound },
+]
 
 export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
-  const { t } = useLanguage()
-
-  const tabButtonClass = (active: boolean) =>
-    [
-      'relative flex flex-1 flex-col items-center justify-center gap-1 rounded-[18px] py-2 transition-all duration-200',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
-      active
-        ? 'border border-brand-line bg-white text-brand-blue shadow-[0_10px_24px_rgba(24,38,59,0.08)]'
-        : 'border border-transparent text-slate-400 hover:bg-white/70',
-    ].join(' ')
-
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-40 mx-auto w-full max-w-[var(--app-shell-width)] rounded-t-[28px] border border-brand-line bg-white/95 px-2 pt-2 shadow-soft backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[var(--app-shell-width)] border-t border-brand-line bg-white/95 px-2 pt-2 shadow-soft backdrop-blur"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="flex gap-1">
-        {navItems.map(({ tab }) => {
+      <div className="grid grid-cols-4 gap-1">
+        {items.map(({ tab, label, Icon }) => {
           const active = activeTab === tab
-          const Icon =
-            tab === 'home'
-              ? HomeIcon
-              : tab === 'requests'
-                ? OrdersIcon
-                : tab === 'rating'
-                  ? RatingIcon
-                  : ProfileIcon
 
           return (
             <button
               key={tab}
               type="button"
-              className={tabButtonClass(active)}
               onClick={() => onTabChange(tab)}
               aria-current={active ? 'page' : undefined}
+              className={cn(
+                'flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-xs font-black transition',
+                active ? 'bg-brand-blue/10 text-brand-blue' : 'text-slate-400',
+              )}
             >
-              <Icon active={active} />
-              <span
-                className={
-                  active
-                    ? 'text-brand-blue text-xs font-semibold'
-                    : 'text-slate-400 text-xs font-medium'
-                }
-              >
-                {tab === 'home'
-                  ? "Bosh sahifa"
-                  : tab === 'requests'
-                    ? "Arizalar"
-                    : tab === 'rating'
-                      ? "Baholash"
-                      : "Profil"}
-              </span>
-              {active ? (
-                <span className="absolute -bottom-[2px] h-1.5 w-8 rounded-full bg-brand-blue/20" />
-              ) : null}
+              <Icon className={cn('h-5 w-5', active && tab === 'rating' ? 'fill-brand-blue' : '')} />
+              <span>{label}</span>
             </button>
           )
         })}
