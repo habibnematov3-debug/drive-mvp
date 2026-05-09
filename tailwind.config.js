@@ -4,13 +4,13 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Outfit', 'system-ui', 'sans-serif'],
+        sans: ['Nunito', 'system-ui', 'sans-serif'],
       },
       colors: {
         brand: {
-          blue: '#2F97D4',
-          'blue-soft': '#EAF5FC',
-          bg: '#F6F7FA',
+          blue: '#1A4FD8',
+          'blue-soft': '#E9EFFF',
+          bg: '#F2F1ED',
           line: '#E2E7EE',
           muted: '#7A8798',
           ink: '#18263B',

@@ -29,7 +29,7 @@ function HomeIcon({ active }: { active: boolean }) {
 }
 
 function OrdersIcon({ active }: { active: boolean }) {
-  const color = active ? '#2F97D4' : '#94A3B8'
+  const color = active ? '#1A4FD8' : '#94A3B8'
 
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -49,8 +49,23 @@ function OrdersIcon({ active }: { active: boolean }) {
   )
 }
 
+function RatingIcon({ active }: { active: boolean }) {
+  const color = active ? '#1A4FD8' : '#94A3B8'
+
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 3.5l2.6 5.4 6 .9-4.3 4.1 1 5.9-5.3-2.8-5.3 2.8 1-5.9-4.3-4.1 6-.9L12 3.5Z"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function ProfileIcon({ active }: { active: boolean }) {
-  const color = active ? '#2F97D4' : '#94A3B8'
+  const color = active ? '#1A4FD8' : '#94A3B8'
 
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -90,7 +105,13 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
         {navItems.map(({ tab }) => {
           const active = activeTab === tab
           const Icon =
-            tab === 'home' ? HomeIcon : tab === 'orders' ? OrdersIcon : ProfileIcon
+            tab === 'home'
+              ? HomeIcon
+              : tab === 'requests'
+                ? OrdersIcon
+                : tab === 'rating'
+                  ? RatingIcon
+                  : ProfileIcon
 
           return (
             <button
@@ -109,10 +130,12 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
                 }
               >
                 {tab === 'home'
-                  ? t('navigation.home')
-                  : tab === 'orders'
-                    ? t('navigation.orders')
-                    : t('navigation.profile')}
+                  ? "Bosh sahifa"
+                  : tab === 'requests'
+                    ? "Arizalar"
+                    : tab === 'rating'
+                      ? "Baholash"
+                      : "Profil"}
               </span>
               {active ? (
                 <span className="absolute -bottom-[2px] h-1.5 w-8 rounded-full bg-brand-blue/20" />

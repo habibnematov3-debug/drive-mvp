@@ -4,12 +4,15 @@ import './index.css'
 import './styles/telegram.css'
 import App from './App.tsx'
 import { LanguageProvider } from './contexts/LanguageContext.tsx'
+import { DriveeProvider } from './contexts/DriveeContext.tsx'
 
 // Fixed typo: creatRoot -> createRoot
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LanguageProvider>
-      <App />
+      <DriveeProvider>
+        <App />
+      </DriveeProvider>
     </LanguageProvider>
   </StrictMode>,
 )

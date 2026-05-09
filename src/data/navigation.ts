@@ -6,6 +6,7 @@ export type NavItem = {
 
 export const navItems: NavItem[] = [
   { tab: 'home' },
-  { tab: 'orders' },
+  { tab: 'requests' },
+  { tab: 'rating' },
   { tab: 'profile' },
 ]

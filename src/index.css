@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --app-shell-width: 430px;
+    --app-shell-width: 390px;
   }
 
   html,
@@ -14,14 +14,11 @@
 
   body {
     margin: 0;
-    font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 16px;
     line-height: 1.5;
     color: #1a1c1e;
-    background: 
-      radial-gradient(circle at top left, rgba(47, 151, 212, 0.08), transparent 40%),
-      radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.05), transparent 40%),
-      #f8fafd;
+    background: #f2f1ed;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow: hidden; /* Prevents bounce on iOS */
