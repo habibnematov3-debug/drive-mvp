@@ -18,12 +18,6 @@ type TelegramWebApp = {
   expand?: () => void
   close?: () => void
   openTelegramLink?: (url: string) => void
-  requestLocation?: (callback: (location: unknown) => void) => void
-  HapticFeedback?: {
-    impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
-    notificationOccurred?: (type: 'error' | 'success' | 'warning') => void
-    selectionChanged?: () => void
-  }
 }
 
 type TelegramWindow = Window & {
@@ -51,11 +45,6 @@ export function getTelegramUser() {
 export function getTelegramWebApp() {
   if (typeof window === 'undefined') return null
   return (window as TelegramWindow).Telegram?.WebApp ?? null
-}
-
-export function isTelegramMiniApp() {
-  const webApp = getTelegramWebApp()
-  return Boolean(webApp?.requestLocation && webApp.initData?.trim())
 }
 
 export function getTelegramInitData() {
@@ -136,49 +125,4 @@ export function openTelegramUrl(url: string) {
   if (typeof window !== 'undefined') {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
-}
-
-export type TelegramLocation = {
-  latitude?: number
-  longitude?: number
-}
-
-export function requestTelegramLocation(): Promise<TelegramLocation> {
-  const webApp = getTelegramWebApp()
-
-  return new Promise((resolve, reject) => {
-    if (!webApp?.requestLocation) {
-      reject(new Error("GPS ishlamadi. Tumaningizni qo'lda tanlang."))
-      return
-    }
-
-    try {
-      webApp.requestLocation((location) => {
-        const obj = location as TelegramLocation | null
-        const latitude = obj?.latitude
-        const longitude = obj?.longitude
-
-        if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-          reject(new Error("GPS ma'lumoti olinmadi. Tumaningizni qo'lda tanlang."))
-          return
-        }
-
-        resolve({ latitude, longitude })
-      })
-    } catch (error) {
-      reject(error instanceof Error ? error : new Error("GPS ishlamadi. Qayta urinib ko'ring."))
-    }
-  })
-}
-
-export function hapticImpact(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light') {
-  getTelegramWebApp()?.HapticFeedback?.impactOccurred?.(style)
-}
-
-export function hapticSelection() {
-  getTelegramWebApp()?.HapticFeedback?.selectionChanged?.()
-}
-
-export function hapticNotify(type: 'error' | 'success' | 'warning') {
-  getTelegramWebApp()?.HapticFeedback?.notificationOccurred?.(type)
 }

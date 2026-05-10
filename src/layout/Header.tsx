@@ -6,10 +6,10 @@ type HeaderProps = {
 export default function Header({ title, subtitle }: HeaderProps) {
   return (
     <header className="px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.85rem)]">
-      <div className="rounded-lg border border-brand-line bg-white/90 px-4 py-4 shadow-soft backdrop-blur">
+      <div className="rounded-[28px] border border-brand-line bg-white/90 px-4 py-4 shadow-soft backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-[1.95rem] font-black leading-none tracking-normal text-brand-blue">
+            <h1 className="text-[1.95rem] font-black leading-none tracking-[-0.04em] text-brand-blue">
               {title}
             </h1>
             {subtitle ? (
