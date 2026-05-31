@@ -7,9 +7,12 @@ const {
   getBookingById,
   getDriverByTelegramId,
   getDriverRating,
+  getOfferedDrivers,
   registerDriver,
+  removeDriverFromOffers,
   resetPendingBooking,
   saveRating,
+  selectDriverByPassenger,
   storeBookingGroupMessage,
   upsertTelegramUser,
 } = require('./sheets')
@@ -189,6 +192,43 @@ function buildPassengerFoundMessage(driver, ratingInfo) {
   return lines.join('\n')
 }
 
+function buildOfferedDriversMessage(drivers, bookingId) {
+  const lines = ['🚗 Haydovchilari tanlang:']
+  
+  drivers.forEach((driver, index) => {
+    const ratingLabel = driver.rating ? `⭐️${driver.rating.toFixed(1)}` : '⭐️ yangi'
+    lines.push(`\n${index + 1}. ${driver.name}`)
+    lines.push(`   📞 ${formatPhone(driver.phone)}`)
+    if (driver.carModel) {
+      lines.push(`   🚗 ${driver.carModel}`)
+    }
+    lines.push(`   ${ratingLabel}`)
+  })
+  
+  lines.push('\nTanlang 👇')
+  return lines.join('\n')
+}
+
+function buildSelectDriverKeyboard(drivers, bookingId) {
+  const buttons = drivers.map((driver, index) => [
+    Markup.button.callback(
+      `${index + 1}. ${driver.name} ⭐️`,
+      `select_driver:${bookingId}:${driver.telegramId}`
+    ),
+  ])
+  
+  buttons.push([Markup.button.callback('❌ Batil', `cancel_select:${bookingId}`)])
+  
+  return Markup.inlineKeyboard(buttons)
+}
+
+function buildNewDriverAddedMessage(count) {
+  if (count === 1) {
+    return '✅ Haydovchi topildi! Tanlang 👇'
+  }
+  return `✅ Yangi haydovchi taklif qilindi! Endi ${count} ta haydovchi bo'ldi. Tanlang 👇`
+}
+
 function buildDriverPassengerMessage(booking) {
   return [
     "✅ Yo'lovchi tasdiqladi!",
@@ -220,24 +260,21 @@ function buildRatingRequestMessage() {
 
 function buildStartMessage() {
   return [
-    '🚗 Haydovchi qidirib charchadingizmi?',
+    'Assalomu alaykum!',
     '',
-    "Telegram gruppalarda soatlab kutish,",
-    "ko'p qo'ng'iroqlar va noaniq narxlar bezdirdimi?",
-    '',
-    'Drivee ilovasiga kiring va 1 daqiqada mashina toping. 👇',
+    "Safar so'rovini yaratish uchun Drivee Mini App ilovasini oching.",
   ].join('\n')
 }
 
 function buildStartKeyboard() {
-  const webAppUrl = String(process.env.WEBAPP_URL || '').trim()
+  const miniAppUrl = String(process.env.MINI_APP_URL || '').trim()
 
-  if (!webAppUrl) {
+  if (!miniAppUrl) {
     return undefined
   }
 
   return Markup.inlineKeyboard([
-    [Markup.button.webApp('🚀 Ilovaga kirish', webAppUrl)],
+    [Markup.button.webApp('Ilovani ochish 🚗', miniAppUrl)],
   ])
 }
 
@@ -619,79 +656,191 @@ function attachBotHandlers(botInstance) {
     const claimResult = await claimBooking(bookingId, driver)
 
     if (!claimResult.ok) {
+      if (claimResult.reason === 'max_drivers_reached') {
+        await ctx.answerCbQuery("❌ Ariza allaqachon 3 ta haydovchiga yuborilgan", { show_alert: true })
+      } else if (claimResult.reason === 'already_claimed') {
+        await ctx.answerCbQuery("Siz bu arizani allaqachon oldingiz.", { show_alert: true })
+      } else {
+        const message =
+          claimResult.reason === 'not_found'
+            ? 'Ariza topilmadi.'
+            : 'Bu arizada xatolik yuz berdi.'
+
+        await ctx.answerCbQuery(message, {
+          show_alert: claimResult.reason !== 'not_found',
+        })
+      }
+      return
+    }
+
+    const { booking, isFirstDriver, offeredDrivers } = claimResult
+
+    if (!booking.passengerTelegramUserId) {
+      await ctx.answerCbQuery("Yo'lovchi bilan bog'lanib bo'lmadi.", { show_alert: true })
+      return
+    }
+
+    // Fetch ratings for all offered drivers
+    const driversWithRatings = await Promise.all(
+      offeredDrivers.map(async (d) => {
+        try {
+          const rating = await getDriverRating(d.telegramId)
+          return {
+            ...d,
+            rating: rating?.averageRating || null,
+          }
+        } catch {
+          return d
+        }
+      }),
+    )
+
+    try {
+      if (isFirstDriver) {
+        // First driver: send new list to passenger
+        await ctx.telegram.sendMessage(
+          booking.passengerTelegramUserId,
+          buildOfferedDriversMessage(driversWithRatings, bookingId),
+          buildSelectDriverKeyboard(driversWithRatings, bookingId),
+        )
+        await ctx.answerCbQuery("✅ Yo'lovchiga yuborildi.")
+      } else {
+        // 2nd or 3rd driver: notify about new driver
+        const message = buildNewDriverAddedMessage(driversWithRatings.length)
+        await ctx.telegram.sendMessage(
+          booking.passengerTelegramUserId,
+          message,
+          buildSelectDriverKeyboard(driversWithRatings, bookingId),
+        )
+        await ctx.answerCbQuery("✅ Yo'lovchiga yangi haydovchi xabari yuborildi.")
+      }
+
+      // Update group message with driver count
+      const groupStatusLabel = `${driversWithRatings.length} ta haydovchi taklif qildi`
+      await editGroupMessageForStatus(bookingId, booking, {
+        statusLabel: groupStatusLabel,
+      }).catch((error) => {
+        console.error('[Bot] Failed to update group message:', error.message)
+      })
+    } catch (error) {
+      console.error('[Bot] Failed to notify passenger:', error.message)
+      await ctx.answerCbQuery("Yo'lovchiga xabar yuborilmadi.", { show_alert: true })
+    }
+  })
+
+  botInstance.action(/^select_driver:(.+):(.+)$/, async (ctx) => {
+    const bookingId = String(ctx.match?.[1] || '').trim()
+    const selectedDriverId = String(ctx.match?.[2] || '').trim()
+    const passengerTelegramId = String(ctx.from?.id || '')
+
+    if (!bookingId || !selectedDriverId || !passengerTelegramId) {
+      await ctx.answerCbQuery("Arizani aniqlab bo'lmadi.")
+      return
+    }
+
+    const selectResult = await selectDriverByPassenger(
+      bookingId,
+      passengerTelegramId,
+      selectedDriverId,
+    )
+
+    if (!selectResult.ok) {
       const message =
-        claimResult.reason === 'not_found'
-          ? 'Ariza topilmadi.'
-          : 'Bu ariza allaqachon olindi.'
+        selectResult.reason === 'forbidden'
+          ? "Bu tugma siz uchun emas."
+          : selectResult.reason === 'not_pending_offers'
+            ? "Bu ariza endi haydovchi tanlashni kutmayapti."
+            : selectResult.reason === 'driver_not_found'
+              ? "Haydovchi topilmadi."
+              : "Arizani aniqlab bo'lmadi."
 
       await ctx.answerCbQuery(message, {
-        show_alert: claimResult.reason !== 'not_found',
+        show_alert: selectResult.reason === 'forbidden',
       })
       return
     }
 
-    const { booking } = claimResult
+    const { booking, selectedDriver, offeredDrivers } = selectResult
 
     try {
       await ctx.editMessageText(
-        buildGroupMessage(booking.bookingId, buildBookingPayloadFromRecord(booking), {
-          statusLabel: 'kutilmoqda',
-          driver,
-        }),
+        [
+          '✅ Haydovchi tasdiqlandi!',
+          `Haydovchi: ${selectedDriver.name}`,
+          `Tel: ${formatPhone(selectedDriver.phone)}`,
+          selectedDriver.carModel ? `Mashina: ${selectedDriver.carModel}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n'),
       )
+    } catch (error) {
+      console.error('[Bot] Failed to edit passenger selection message:', error.message)
+    }
+
+    // Notify selected driver
+    try {
+      await ctx.telegram.sendMessage(
+        selectedDriver.telegramId,
+        buildDriverPassengerMessage(booking),
+      )
+      await ctx.telegram.sendMessage(
+        selectedDriver.telegramId,
+        buildTripCompletionRequestMessage(),
+        buildTripCompletionKeyboard(bookingId),
+      )
+    } catch (error) {
+      console.error('[Bot] Failed to notify selected driver:', error.message)
+    }
+
+    // Notify other drivers that they were not selected
+    const otherDrivers = offeredDrivers.filter((d) => String(d.telegramId) !== String(selectedDriverId))
+    for (const otherDriver of otherDrivers) {
+      try {
+        await ctx.telegram.sendMessage(
+          otherDriver.telegramId,
+          "❌ Yo'lovchi boshqa haydovchi tanladi.",
+        )
+      } catch (error) {
+        console.error('[Bot] Failed to notify other driver:', error.message)
+      }
+    }
+
+    // Update group message
+    try {
+      await editGroupMessageForStatus(bookingId, booking, {
+        statusLabel: 'jarayonda',
+        driver: selectedDriver,
+      })
     } catch (error) {
       console.error('[Bot] Failed to update group message:', error.message)
     }
 
-    if (!booking.passengerTelegramUserId) {
-      await resetPendingBooking(booking.bookingId)
-      await editGroupMessageForStatus(booking.bookingId, booking, {
-        statusLabel: 'yangi',
-        restoreButton: true,
-      }).catch((error) => {
-        console.error('[Bot] Failed to restore group message:', error.message)
-      })
-      await ctx.answerCbQuery("Yo'lovchi bilan bog'lanib bo'lmadi.")
+    await ctx.answerCbQuery('✅ Tasdiqlandi!')
+  })
+
+  botInstance.action(/^cancel_select:(.+)$/, async (ctx) => {
+    const bookingId = String(ctx.match?.[1] || '').trim()
+    const passengerTelegramId = String(ctx.from?.id || '')
+
+    if (!bookingId || !passengerTelegramId) {
+      await ctx.answerCbQuery("Arizani aniqlab bo'lmadi.")
       return
     }
 
-    let driverRating = null
+    const booking = await getBookingById(bookingId)
 
-    try {
-      driverRating = await getDriverRating(driver.telegramId)
-    } catch (error) {
-      console.error('[Bot] Failed to load driver rating:', error.message)
-    }
-
-    try {
-      await ctx.telegram.sendMessage(
-        booking.passengerTelegramUserId,
-        buildPassengerFoundMessage(driver, driverRating),
-        buildPassengerDecisionKeyboard(booking.bookingId),
-      )
-    } catch (error) {
-      console.error('[Bot] Failed to notify passenger:', error.message)
-      const resetResult = await resetPendingBooking(booking.bookingId)
-      if (resetResult.ok) {
-        await editGroupMessageForStatus(booking.bookingId, resetResult.booking, {
-          statusLabel: 'yangi',
-          restoreButton: true,
-        }).catch((groupError) => {
-          console.error('[Bot] Failed to restore group message:', groupError.message)
-        })
-      }
-      await ctx.telegram.sendMessage(
-        telegramId,
-        "Yo'lovchiga tasdiqlash xabari yuborilmadi. Ariza qayta ochildi.",
-      ).catch((notifyError) => {
-        console.error('[Bot] Failed to notify driver:', notifyError.message)
-      })
-      await ctx.answerCbQuery("Yo'lovchiga xabar yuborilmadi.")
+    if (!booking || booking.passengerTelegramUserId !== passengerTelegramId) {
+      await ctx.answerCbQuery("Bu tugma siz uchun emas.", { show_alert: true })
       return
     }
 
-    await schedulePendingConfirmation(booking, driver)
-    await ctx.answerCbQuery("Yo'lovchi tasdig'i kutilmoqda.")
+    try {
+      await ctx.editMessageText("❌ Siz tanlashni bekor qildingiz. Yangi haydovchi kutilmoqda...")
+    } catch (error) {
+      console.error('[Bot] Failed to edit cancel message:', error.message)
+    }
+
+    await ctx.answerCbQuery('Bekor qilindi.')
   })
 
   botInstance.action(/^passenger_confirm:(.+)$/, async (ctx) => {

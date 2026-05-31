@@ -25,6 +25,8 @@ const BOOKINGS_HEADERS = [
   'haydovchi_mashina',
   'group_chat_id',
   'group_message_id',
+  'offered_drivers_json',
+  'selected_driver_id',
 ]
 const USERS_SHEET_NAME = 'users'
 const USERS_HEADERS = [
@@ -54,10 +56,12 @@ const RATINGS_HEADERS = [
   'created_at',
 ]
 const BOOKING_STATUS_NEW = 'yangi'
+const BOOKING_STATUS_PENDING_OFFERS = 'pending_driver_offers'
 const BOOKING_STATUS_PENDING = 'kutilmoqda'
 const BOOKING_STATUS_IN_PROGRESS = 'jarayonda'
 const BOOKING_STATUS_COMPLETED = 'tugallandi'
 const BOOKING_STATUS_CANCELLED = 'bekor qilindi'
+const MAX_OFFERED_DRIVERS = 3
 
 const ROUTE_LABELS_BY_ID = {
   'kokand-tashkent': 'Kokand -> Tashkent',
@@ -851,30 +855,64 @@ async function claimBooking(bookingId, driver) {
       return { ok: false, reason: 'not_found' }
     }
 
-    if (booking.record.status !== BOOKING_STATUS_NEW) {
+    const currentStatus = booking.record.status
+    const isNew = currentStatus === BOOKING_STATUS_NEW
+    const isPendingOffers = currentStatus === BOOKING_STATUS_PENDING_OFFERS
+
+    if (!isNew && !isPendingOffers) {
       return { ok: false, reason: 'already_taken', booking: booking.record }
     }
 
-    const nextRow = attachDriverToRow(
-      {
-        ...booking.record.rowObject,
-        holat: BOOKING_STATUS_PENDING,
-      },
-      driver,
-    )
+    // Parse existing offered drivers
+    let offeredDrivers = []
+    try {
+      const json = String(booking.record.rowObject.offered_drivers_json || '').trim()
+      if (json) {
+        offeredDrivers = JSON.parse(json)
+      }
+    } catch (error) {
+      console.error('[Sheets] Failed to parse offered_drivers_json:', error.message)
+      offeredDrivers = []
+    }
+
+    // Check if driver already claimed this booking
+    if (offeredDrivers.some((d) => String(d.telegramId) === String(driver.telegramId))) {
+      return { ok: false, reason: 'already_claimed', booking: booking.record }
+    }
+
+    // Check if we already have max drivers
+    if (offeredDrivers.length >= MAX_OFFERED_DRIVERS) {
+      return { ok: false, reason: 'max_drivers_reached', booking: booking.record }
+    }
+
+    // Add new driver to offers
+    offeredDrivers.push({
+      telegramId: String(driver.telegramId),
+      name: driver.name,
+      phone: driver.phone,
+      carModel: driver.carModel,
+      addedAt: new Date().toISOString(),
+    })
+
+    // Determine new status
+    const newStatus = isNew && offeredDrivers.length === 1 ? BOOKING_STATUS_PENDING_OFFERS : BOOKING_STATUS_PENDING_OFFERS
+
+    const nextRow = {
+      ...booking.record.rowObject,
+      holat: newStatus,
+      offered_drivers_json: JSON.stringify(offeredDrivers),
+    }
 
     await updateBookingRow(booking.record.rowNumber, nextRow)
 
     return {
       ok: true,
+      isFirstDriver: isNew,
+      offeredDrivers,
       booking: {
         ...booking.record,
-        status: BOOKING_STATUS_PENDING,
+        status: newStatus,
         rowObject: nextRow,
-        driverName: driver.name,
-        driverPhone: driver.phone,
-        driverTelegramId: String(driver.telegramId),
-        driverCarModel: driver.carModel,
       },
     }
   })
@@ -915,6 +953,149 @@ async function confirmPendingBooking(bookingId, passengerTelegramUserId) {
       booking: {
         ...booking.record,
         status: BOOKING_STATUS_IN_PROGRESS,
+        rowObject: nextRow,
+      },
+    }
+  })
+}
+
+async function getOfferedDrivers(bookingId) {
+  const booking = await findBookingById(bookingId)
+
+  if (!booking) {
+    return { ok: false, reason: 'not_found', drivers: [] }
+  }
+
+  try {
+    const json = String(booking.record.rowObject.offered_drivers_json || '').trim()
+    const drivers = json ? JSON.parse(json) : []
+    return { ok: true, drivers, booking: booking.record }
+  } catch (error) {
+    console.error('[Sheets] Failed to parse offered_drivers_json:', error.message)
+    return { ok: false, reason: 'parse_error', drivers: [] }
+  }
+}
+
+async function selectDriverByPassenger(bookingId, passengerTelegramUserId, selectedDriverTelegramId) {
+  return withBookingLock(bookingId, async () => {
+    const booking = await findBookingById(bookingId)
+
+    if (!booking) {
+      return { ok: false, reason: 'not_found' }
+    }
+
+    if (
+      passengerTelegramUserId &&
+      booking.record.passengerTelegramUserId !== String(passengerTelegramUserId)
+    ) {
+      return { ok: false, reason: 'forbidden', booking: booking.record }
+    }
+
+    if (booking.record.status !== BOOKING_STATUS_PENDING_OFFERS) {
+      return { ok: false, reason: 'not_pending_offers', booking: booking.record }
+    }
+
+    // Parse offered drivers
+    let offeredDrivers = []
+    try {
+      const json = String(booking.record.rowObject.offered_drivers_json || '').trim()
+      if (json) {
+        offeredDrivers = JSON.parse(json)
+      }
+    } catch (error) {
+      console.error('[Sheets] Failed to parse offered_drivers_json:', error.message)
+      return { ok: false, reason: 'parse_error', booking: booking.record }
+    }
+
+    // Find selected driver
+    const selectedDriver = offeredDrivers.find((d) => String(d.telegramId) === String(selectedDriverTelegramId))
+
+    if (!selectedDriver) {
+      return { ok: false, reason: 'driver_not_found', booking: booking.record }
+    }
+
+    // Update row with selected driver and status
+    const nextRow = attachDriverToRow(
+      {
+        ...booking.record.rowObject,
+        holat: BOOKING_STATUS_PENDING,
+        selected_driver_id: String(selectedDriverTelegramId),
+      },
+      {
+        telegramId: selectedDriver.telegramId,
+        name: selectedDriver.name,
+        phone: selectedDriver.phone,
+        carModel: selectedDriver.carModel,
+      },
+    )
+
+    await updateBookingRow(booking.record.rowNumber, nextRow)
+
+    return {
+      ok: true,
+      offeredDrivers,
+      selectedDriver,
+      booking: {
+        ...booking.record,
+        status: BOOKING_STATUS_PENDING,
+        rowObject: nextRow,
+        driverName: selectedDriver.name,
+        driverPhone: selectedDriver.phone,
+        driverTelegramId: String(selectedDriver.telegramId),
+        driverCarModel: selectedDriver.carModel,
+      },
+    }
+  })
+}
+
+async function removeDriverFromOffers(bookingId, driverTelegramId) {
+  return withBookingLock(bookingId, async () => {
+    const booking = await findBookingById(bookingId)
+
+    if (!booking) {
+      return { ok: false, reason: 'not_found' }
+    }
+
+    if (booking.record.status !== BOOKING_STATUS_PENDING_OFFERS) {
+      return { ok: false, reason: 'not_pending_offers', booking: booking.record }
+    }
+
+    // Parse offered drivers
+    let offeredDrivers = []
+    try {
+      const json = String(booking.record.rowObject.offered_drivers_json || '').trim()
+      if (json) {
+        offeredDrivers = JSON.parse(json)
+      }
+    } catch (error) {
+      console.error('[Sheets] Failed to parse offered_drivers_json:', error.message)
+      return { ok: false, reason: 'parse_error', booking: booking.record }
+    }
+
+    // Remove driver
+    const filteredDrivers = offeredDrivers.filter((d) => String(d.telegramId) !== String(driverTelegramId))
+
+    if (filteredDrivers.length === offeredDrivers.length) {
+      return { ok: false, reason: 'driver_not_found', offeredDrivers, booking: booking.record }
+    }
+
+    // If no drivers left, go back to NEW status
+    const newStatus = filteredDrivers.length === 0 ? BOOKING_STATUS_NEW : BOOKING_STATUS_PENDING_OFFERS
+
+    const nextRow = {
+      ...booking.record.rowObject,
+      holat: newStatus,
+      offered_drivers_json: filteredDrivers.length > 0 ? JSON.stringify(filteredDrivers) : '',
+    }
+
+    await updateBookingRow(booking.record.rowNumber, nextRow)
+
+    return {
+      ok: true,
+      offeredDrivers: filteredDrivers,
+      booking: {
+        ...booking.record,
+        status: newStatus,
         rowObject: nextRow,
       },
     }
@@ -1076,10 +1257,13 @@ module.exports = {
   getBookingById,
   getDriverByTelegramId,
   getDriverRating,
+  getOfferedDrivers,
   listBookingsByTelegramUser,
   registerDriver,
+  removeDriverFromOffers,
   resetPendingBooking,
   saveRating,
+  selectDriverByPassenger,
   storeBookingGroupMessage,
   upsertTelegramUser,
   HEADERS: BOOKINGS_HEADERS,
