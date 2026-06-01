@@ -118,7 +118,13 @@ export function openTelegramUrl(url: string) {
   const webApp = getTelegramWebApp()
 
   if (webApp?.openTelegramLink) {
-    webApp.openTelegramLink(url)
+    // Convert https://t.me/username to tg://resolve/username for proper Telegram app handling
+    let telegramUrl = url
+    if (url.startsWith('https://t.me/')) {
+      const username = url.replace('https://t.me/', '')
+      telegramUrl = `tg://resolve/${username}`
+    }
+    webApp.openTelegramLink(telegramUrl)
     return
   }
 

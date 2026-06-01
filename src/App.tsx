@@ -23,7 +23,7 @@ import {
 
 type AuthState = 'loading' | 'ready' | 'telegram_required' | 'error'
 type OrderActionResult = { ok: true } | { ok: false; error: string }
-const SUPPORT_TELEGRAM_URL = 'https://t.me/drivee8_bot'
+const SUPPORT_TELEGRAM_URL = 'https://t.me/drivee_inc'
 
 function isNetworkFetchError(error: unknown) {
   if (!(error instanceof Error)) return false
